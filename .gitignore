@@ -1,0 +1,10 @@
+# build output
+/target/
+
+# secrets / local env (see .env.example)
+.env
+.env.local
+
+# editor / rust noise
+*.rs.bk
+.DS_Store

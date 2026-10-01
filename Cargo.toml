@@ -1,0 +1,3 @@
+[workspace]
+members = ["opensearch-rs", "xtask"]
+resolver = "2"
