@@ -71,6 +71,7 @@ pub(crate) struct SearchError {
     pub(crate) kind: SearchFailureClass,
     pub(crate) message: String,
     pub(crate) retriable: bool,
+    pub(crate) retry_after_secs: Option<u64>,
 }
 
 impl SearchError {
@@ -79,6 +80,7 @@ impl SearchError {
             kind,
             message: message.into(),
             retriable: false,
+            retry_after_secs: None,
         }
     }
 
@@ -87,11 +89,17 @@ impl SearchError {
             kind,
             message: message.into(),
             retriable: true,
+            retry_after_secs: None,
         }
     }
 
     pub(crate) fn public_message(&self) -> String {
         format!("[{}] {}", self.kind.as_str(), self.message)
+    }
+
+    pub(crate) fn with_retry_after(mut self, seconds: u64) -> Self {
+        self.retry_after_secs = Some(seconds.clamp(1, 3600));
+        self
     }
 }
 

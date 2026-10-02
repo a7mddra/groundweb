@@ -1,0 +1,489 @@
+{
+  "branch": "auto",
+  "model_runs": [],
+  "note": "Live best-effort observations, not an accuracy guarantee. Counts distinguish discovered sources from retrieved pages. Negative cases are included.",
+  "retrieval_latency_ms": {
+    "median": 492,
+    "p95": 5218
+  },
+  "runs": [
+    {
+      "case": "repository",
+      "context_chars": 5512,
+      "elapsed_ms": 1179,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 1,
+      "sources": 1,
+      "urls": [
+        "https://github.com/tokio-rs/axum"
+      ]
+    },
+    {
+      "case": "raw_file",
+      "context_chars": 7082,
+      "elapsed_ms": 353,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 1,
+      "sources": 1,
+      "urls": [
+        "https://github.com/tokio-rs/axum/blob/main/axum/Cargo.toml"
+      ]
+    },
+    {
+      "case": "issue",
+      "context_chars": 1357,
+      "elapsed_ms": 826,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 1,
+      "sources": 1,
+      "urls": [
+        "https://github.com/rust-lang/rust/issues/1"
+      ]
+    },
+    {
+      "case": "releases",
+      "context_chars": 2404,
+      "elapsed_ms": 503,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 1,
+      "sources": 1,
+      "urls": [
+        "https://github.com/tokio-rs/axum/releases"
+      ]
+    },
+    {
+      "case": "public_post",
+      "context_chars": 231,
+      "elapsed_ms": 1498,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 1,
+      "sources": 1,
+      "urls": [
+        "https://x.com/jack/status/20"
+      ]
+    },
+    {
+      "case": "mixed_urls",
+      "context_chars": 11050,
+      "elapsed_ms": 488,
+      "favicons": 2,
+      "limitations": [
+        "branch=auto mode=url results=2",
+        "2 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 2,
+      "repeat": 1,
+      "sources": 2,
+      "urls": [
+        "https://github.com/tokio-rs/axum",
+        "https://github.com/actix/actix-web"
+      ]
+    },
+    {
+      "case": "article",
+      "context_chars": 1442,
+      "elapsed_ms": 492,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 1,
+      "sources": 1,
+      "urls": [
+        "https://en.wikipedia.org/wiki/Rust_(programming_language)"
+      ]
+    },
+    {
+      "case": "search_technical",
+      "context_chars": 51582,
+      "elapsed_ms": 5218,
+      "favicons": 8,
+      "limitations": [
+        "branch=auto mode=auto results=12",
+        "mojeek: [challenge] Mojeek temporarily blocked automated requests; bing: [no_results] Bing RSS returned no usable items; parallel: 10 results; public_sources: 12 results; wikipedia: 0 hits; stack_exchange: 0 hits; github: 10 hits; hacker_news: 10 hits; Rust Blog: 0 hits; crates.io: 1 hits; Hacker News: [http_status] HTTP 419 from https://news.ycombinator.com/rss; Lobsters: 0 hits; exa: 12 results",
+        "3 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "auto",
+      "pages_read": 3,
+      "repeat": 1,
+      "sources": 12,
+      "urls": [
+        "https://docs.rs/reqwest/latest/reqwest/blocking/struct.ClientBuilder.html",
+        "https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html",
+        "https://relm4.org/docs/stable/reqwest/struct.ClientBuilder.html",
+        "https://tikv.github.io/doc/reqwest/struct.ClientBuilder.html",
+        "https://github.com/seanmonstar/reqwest/issues/1454",
+        "https://github.com/seanmonstar/reqwest/blob/master/src/blocking/client.rs",
+        "https://news.ycombinator.com/item?id=30108847",
+        "https://news.ycombinator.com/item?id=49492006",
+        "https://users.rust-lang.org/t/reqwest-client-rustls-tls-cannot-establish-https-connection/99296",
+        "https://seanmonstar.com/blog/modular-reqwest/",
+        "https://docs.rs/reqwest-patched/latest/reqwest_patched/struct.ClientBuilder.html",
+        "https://docs.rs/reqwest/latest/reqwest/tls/"
+      ]
+    },
+    {
+      "case": "search_research",
+      "context_chars": 23170,
+      "elapsed_ms": 7412,
+      "favicons": 6,
+      "limitations": [
+        "branch=auto mode=auto results=12",
+        "mojeek: temporarily cooling down after a block/rate limit; bing: [no_results] Bing RSS returned no usable items; parallel: 10 results; exa: 12 results; public_sources: 10 results; wikipedia: 10 hits; arxiv: 4s deadline exceeded",
+        "3 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "auto",
+      "pages_read": 3,
+      "repeat": 1,
+      "sources": 12,
+      "urls": [
+        "https://arxiv.org/abs/2504.14891",
+        "https://arxiv.org/pdf/2504.14891v1",
+        "https://aclanthology.org/2024.eacl-demo.16.pdf",
+        "https://link.springer.com/content/pdf/10.1007/s42979-026-05134-x.pdf",
+        "https://huggingface.co/papers/2311.09476",
+        "https://www.alphaxiv.org/abs/2405.07437",
+        "https://aclanthology.org/2025.findings-naacl.157.pdf",
+        "https://huggingface.co/papers/2409.12941",
+        "https://dl.acm.org/doi/10.1145/3626772.3657957",
+        "https://en.wikipedia.org/wiki/Retrieval-augmented_generation",
+        "https://en.wikipedia.org/wiki/Knowledge_graph",
+        "https://arxiv.org/html/2309.15217v1"
+      ]
+    },
+    {
+      "case": "search_news",
+      "context_chars": 32472,
+      "elapsed_ms": 3827,
+      "favicons": 5,
+      "limitations": [
+        "branch=auto mode=auto results=12",
+        "mojeek: temporarily cooling down after a block/rate limit; bing: 10 results; parallel: 10 results; public_sources: 12 results; stack_exchange: 7 hits; github: 0 hits; wikipedia: 10 hits; Rust Blog: 5 hits; hacker_news: 6 hits; BBC News: 0 hits; Ars Technica: 0 hits; exa: 12 results",
+        "3 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "auto",
+      "pages_read": 3,
+      "repeat": 1,
+      "sources": 12,
+      "urls": [
+        "https://blog.rust-lang.org/releases/",
+        "https://www.gitwatchman.com/track/rust-lang/rust",
+        "https://blog.rust-lang.org/releases/latest/",
+        "https://stackoverflow.com/questions/67062126/what-does-a-caret-version-constraint-mean-in-rust-cargo",
+        "https://stackoverflow.com/questions/79888359/how-to-make-a-type-depend-on-a-constant-generic-parameter-in-rust",
+        "https://www.linuxcompatible.org/story/rust-1990-ships-with-stable-cvariadic-functions/",
+        "https://en.wikipedia.org/wiki/Rust_(programming_language)",
+        "https://social.rust-lang.org/@rust/117366010065071071",
+        "https://github.com/rust-lang/rust/releases",
+        "https://news.ycombinator.com/item?id=45092549",
+        "https://internals.rust-lang.org/t/rust-1-99-0-pre-release-testing/24637",
+        "https://linuxiac.com/rust-1-99-released-with-c-variadic-functions-and-new-stable-apis/"
+      ]
+    },
+    {
+      "case": "blocked_profile",
+      "context_chars": 403,
+      "elapsed_ms": 1123,
+      "favicons": 0,
+      "limitations": [
+        "branch=auto mode=url results=0",
+        "Could not read https://x.com/jack: [parse] [parse] X profile/timeline requires login/JavaScript; paste a public post URL. Do not infer this page's contents.",
+        "0 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 0,
+      "repeat": 1,
+      "sources": 0,
+      "urls": []
+    },
+    {
+      "case": "private_target",
+      "context_chars": 355,
+      "elapsed_ms": 0,
+      "favicons": 0,
+      "limitations": [
+        "branch=auto mode=url results=0",
+        "Could not read http://127.0.0.1:8080/private: [blocked_target] Blocked URL: non-public IP target. Do not infer this page's contents.",
+        "0 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 0,
+      "repeat": 1,
+      "sources": 0,
+      "urls": []
+    },
+    {
+      "case": "repository",
+      "context_chars": 5512,
+      "elapsed_ms": 4,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 2,
+      "sources": 1,
+      "urls": [
+        "https://github.com/tokio-rs/axum"
+      ]
+    },
+    {
+      "case": "raw_file",
+      "context_chars": 7082,
+      "elapsed_ms": 1,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 2,
+      "sources": 1,
+      "urls": [
+        "https://github.com/tokio-rs/axum/blob/main/axum/Cargo.toml"
+      ]
+    },
+    {
+      "case": "issue",
+      "context_chars": 1357,
+      "elapsed_ms": 0,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 2,
+      "sources": 1,
+      "urls": [
+        "https://github.com/rust-lang/rust/issues/1"
+      ]
+    },
+    {
+      "case": "releases",
+      "context_chars": 2404,
+      "elapsed_ms": 0,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 2,
+      "sources": 1,
+      "urls": [
+        "https://github.com/tokio-rs/axum/releases"
+      ]
+    },
+    {
+      "case": "public_post",
+      "context_chars": 231,
+      "elapsed_ms": 0,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 2,
+      "sources": 1,
+      "urls": [
+        "https://x.com/jack/status/20"
+      ]
+    },
+    {
+      "case": "mixed_urls",
+      "context_chars": 11050,
+      "elapsed_ms": 1,
+      "favicons": 2,
+      "limitations": [
+        "branch=auto mode=url results=2",
+        "2 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 2,
+      "repeat": 2,
+      "sources": 2,
+      "urls": [
+        "https://github.com/tokio-rs/axum",
+        "https://github.com/actix/actix-web"
+      ]
+    },
+    {
+      "case": "article",
+      "context_chars": 1442,
+      "elapsed_ms": 0,
+      "favicons": 1,
+      "limitations": [
+        "branch=auto mode=url results=1",
+        "1 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 1,
+      "repeat": 2,
+      "sources": 1,
+      "urls": [
+        "https://en.wikipedia.org/wiki/Rust_(programming_language)"
+      ]
+    },
+    {
+      "case": "search_technical",
+      "context_chars": 50725,
+      "elapsed_ms": 1173,
+      "favicons": 6,
+      "limitations": [
+        "branch=auto mode=auto results=12",
+        "mojeek: temporarily cooling down after a block/rate limit; bing: 10 results; public_sources: 12 results; github: 10 hits; stack_exchange: 0 hits; wikipedia: 0 hits; hacker_news: 10 hits; Rust Blog: 0 hits; Lobsters: 0 hits; crates.io: 1 hits; Hacker News: [http_status] HTTP 419 from https://news.ycombinator.com/rss; exa: 12 results; parallel: 10 results",
+        "3 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "auto",
+      "pages_read": 3,
+      "repeat": 2,
+      "sources": 12,
+      "urls": [
+        "https://docs.rs/reqwest/latest/reqwest/blocking/struct.ClientBuilder.html",
+        "https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html",
+        "https://relm4.org/docs/stable/reqwest/struct.ClientBuilder.html",
+        "https://tikv.github.io/doc/reqwest/struct.ClientBuilder.html",
+        "https://github.com/seanmonstar/reqwest/issues/1454",
+        "https://github.com/seanmonstar/reqwest/blob/master/src/blocking/client.rs",
+        "https://news.ycombinator.com/item?id=30108847",
+        "https://news.ycombinator.com/item?id=49492006",
+        "https://users.rust-lang.org/t/reqwest-client-rustls-tls-cannot-establish-https-connection/99296",
+        "https://seanmonstar.com/blog/modular-reqwest/",
+        "https://forum.xnxx.com/attachments/7-jpg.7713347/",
+        "https://forum.xnxx.com/tags/gifs/"
+      ]
+    },
+    {
+      "case": "search_research",
+      "context_chars": 21451,
+      "elapsed_ms": 4518,
+      "favicons": 6,
+      "limitations": [
+        "branch=auto mode=auto results=12",
+        "mojeek: temporarily cooling down after a block/rate limit; bing: 10 results; parallel: 10 results; exa: 12 results; public_sources: 10 results; wikipedia: 10 hits; arxiv: 4s deadline exceeded",
+        "3 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "auto",
+      "pages_read": 3,
+      "repeat": 2,
+      "sources": 12,
+      "urls": [
+        "https://arxiv.org/abs/2504.14891",
+        "https://arxiv.org/pdf/2504.14891v1",
+        "https://aclanthology.org/2024.eacl-demo.16.pdf",
+        "https://link.springer.com/content/pdf/10.1007/s42979-026-05134-x.pdf",
+        "https://huggingface.co/papers/2311.09476",
+        "https://www.alphaxiv.org/abs/2405.07437",
+        "https://aclanthology.org/2025.findings-naacl.157.pdf",
+        "https://huggingface.co/papers/2409.12941",
+        "https://dl.acm.org/doi/10.1145/3626772.3657957",
+        "https://en.wikipedia.org/wiki/Retrieval-augmented_generation",
+        "https://en.wikipedia.org/wiki/Knowledge_graph",
+        "https://www.academictransfer.com/en/jobs/364340/phd-position-eeg-and-neurobiological-markers"
+      ]
+    },
+    {
+      "case": "search_news",
+      "context_chars": 27221,
+      "elapsed_ms": 2073,
+      "favicons": 5,
+      "limitations": [
+        "branch=auto mode=auto results=12",
+        "mojeek: temporarily cooling down after a block/rate limit; bing: [no_results] Bing RSS returned no usable items; public_sources: 12 results; github: 0 hits; stack_exchange: 7 hits; wikipedia: 10 hits; hacker_news: 6 hits; BBC News: 0 hits; Rust Blog: 5 hits; Ars Technica: 0 hits; exa: 12 results; parallel: 10 results",
+        "3 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "auto",
+      "pages_read": 3,
+      "repeat": 2,
+      "sources": 12,
+      "urls": [
+        "https://blog.rust-lang.org/releases/latest/",
+        "https://blog.rust-lang.org/2026/09/03/Rust-1.98.1/",
+        "https://github.com/rust-lang/rust/releases",
+        "https://releases.rs/",
+        "https://stackoverflow.com/questions/67062126/what-does-a-caret-version-constraint-mean-in-rust-cargo",
+        "https://stackoverflow.com/questions/79888359/how-to-make-a-type-depend-on-a-constant-generic-parameter-in-rust",
+        "https://www.linuxcompatible.org/story/rust-1990-ships-with-stable-cvariadic-functions/",
+        "https://en.wikipedia.org/wiki/Rust_(programming_language)",
+        "https://social.rust-lang.org/@rust/117366010065071071",
+        "https://news.ycombinator.com/item?id=45092549",
+        "https://internals.rust-lang.org/t/rust-1-99-0-pre-release-testing/24637",
+        "https://linuxiac.com/rust-1-99-released-with-c-variadic-functions-and-new-stable-apis/"
+      ]
+    },
+    {
+      "case": "blocked_profile",
+      "context_chars": 403,
+      "elapsed_ms": 1290,
+      "favicons": 0,
+      "limitations": [
+        "branch=auto mode=url results=0",
+        "Could not read https://x.com/jack: [parse] [parse] X profile/timeline requires login/JavaScript; paste a public post URL. Do not infer this page's contents.",
+        "0 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 0,
+      "repeat": 2,
+      "sources": 0,
+      "urls": []
+    },
+    {
+      "case": "private_target",
+      "context_chars": 355,
+      "elapsed_ms": 0,
+      "favicons": 0,
+      "limitations": [
+        "branch=auto mode=url results=0",
+        "Could not read http://127.0.0.1:8080/private: [blocked_target] Blocked URL: non-public IP target. Do not infer this page's contents.",
+        "0 pages retrieved; remaining sources are discovery excerpts only"
+      ],
+      "mode": "url",
+      "pages_read": 0,
+      "repeat": 2,
+      "sources": 0,
+      "urls": []
+    }
+  ]
+}

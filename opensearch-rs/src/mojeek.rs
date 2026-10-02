@@ -1,13 +1,8 @@
 // Copyright 2026 a7mddra
 // SPDX-License-Identifier: Apache-2.0
 
-//! The **Mojeek** query branch — the first (and currently only) branch of the
-//! web-search fan-out. Future branches (e.g. the planned real web scraper)
-//! plug in next to it via `branches::SearchBranch`.
-//!
-//! Mojeek-only: the donor's DuckDuckGo fallback loop is gone. On total
-//! failure the caller (`execute`) falls back to local safe-source candidates,
-//! which need no network search at all.
+//! Keyless Mojeek HTML discovery. New providers dispatch beside it in branches.
+//! Blocks fail promptly so shared discovery can preserve other providers.
 
 use reqwest::{header, StatusCode};
 
@@ -45,7 +40,7 @@ pub(crate) async fn run_mojeek_query_once(
         );
 
         if status == StatusCode::FORBIDDEN {
-            return Err(SearchError::retriable(
+            return Err(SearchError::fatal(
                 SearchFailureClass::Challenge,
                 "Mojeek blocked automated requests (403)",
             ));
@@ -67,7 +62,7 @@ pub(crate) async fn run_mojeek_query_once(
     let html = read_capped_response_body(response, MAX_FETCH_BYTES).await?;
 
     if looks_like_mojeek_block_page(&html) {
-        return Err(SearchError::retriable(
+        return Err(SearchError::fatal(
             SearchFailureClass::Challenge,
             "Mojeek temporarily blocked automated requests",
         ));
@@ -107,7 +102,7 @@ where
 
     let limit = max_results
         .unwrap_or(DEFAULT_MAX_RESULTS)
-        .clamp(1, DEFAULT_MAX_RESULTS);
+        .clamp(1, crate::constants::MAX_RESULTS);
 
     let clients = TransportClients::build().map_err(|e| e.public_message())?;
     let mut progress_ref: Option<&mut (dyn FnMut(String) + Send)> = Some(&mut progress);
@@ -126,7 +121,7 @@ where
     {
         Ok(mut sources) => {
             hydrate_favicons_for_sources(&mut sources).await;
-            println!(
+            eprintln!(
                 "[WebSearch] backend=mojeek success results={}",
                 sources.len()
             );
@@ -137,7 +132,7 @@ where
             Ok(build_query_result(q, sources, None))
         }
         Err(error) => {
-            println!(
+            eprintln!(
                 "[WebSearch] backend=mojeek failed [{}]: {}",
                 error.kind.as_str(),
                 error.message

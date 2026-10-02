@@ -3,27 +3,19 @@
 //! Wiring target: OpenRouter Chat Completions tool calling (OpenAI-compatible
 //! `tools: [{ "type": "function", "function": {...} }]`).
 //!
-//! # Branches
-//!
-//! `execute()` fans out to ONE [`SearchBranch`] per call. Today only
-//! [`SearchBranch::Mojeek`] exists (Mojeek HTML search + safe-source rerank,
-//! keyless and free); the planned real web scraper lands as a new variant.
-//! All branches share the global [`favicon`] layer, `safe_sources`,
-//! `transport` and `fetch` modules.
-//!
-//! There is intentionally NO DuckDuckGo backend (bot blocking / paid tier)
-//! and NO Gemini API usage — the fallback URL suggester speaks
-//! OpenRouter/OpenAI chat-completions syntax.
-//!
-//! `thread_search.rs` from the donor was NOT ported: it is squigit-local
-//! thread scoring over `squigit_storage`, not web search.
+//! Discovery uses free HTTP sources and anonymous hosted MCP endpoints.
+//! Known URLs use native HTTP extraction with site adapters, never a browser.
 
+mod bing;
 mod branches;
 mod constants;
+mod extract;
 pub mod favicon;
 mod fetch;
 mod html;
+mod mcp_search;
 mod mojeek;
+mod public_sources;
 mod retry;
 mod safe_sources;
 mod suggester;
@@ -43,6 +35,7 @@ pub use suggester::suggest_fallback_urls;
 pub use types::{CitationSource, WebSearchResult};
 pub use url_utils::domain_from_url;
 
+use futures_util::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -52,17 +45,14 @@ pub const TOOL_NAME: &str = "web_search";
 /// Crate error type.
 #[derive(Debug)]
 pub enum Error {
-    /// Reserved for branches that are declared but not built yet.
-    NotImplemented(&'static str),
     InvalidArgs(String),
-    /// The branch ran and failed (Mojeek down AND safe-source fallback empty).
+    /// HTTP client initialization or a retrieval operation failed.
     SearchFailed(String),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::NotImplemented(msg) => write!(f, "not implemented: {msg}"),
             Error::InvalidArgs(msg) => write!(f, "invalid tool args: {msg}"),
             Error::SearchFailed(msg) => write!(f, "search failed: {msg}"),
         }
@@ -75,16 +65,16 @@ impl std::error::Error for Error {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchArgs {
     /// The search task, e.g. "search github for rust openrouter tool calling examples".
+    #[serde(default)]
     pub query: String,
-    /// Optional hint URLs the model wants grounded. Currently echoed back in
-    /// the placeholder trace only; branch retrieval ignores them (allowlist
-    /// fetch for hint URLs is future work — see `fetch_url_from_allowed`).
+    /// Public URLs to read directly. URLs embedded in `query` are also read.
+    /// Apps should supply pasted user URLs here, including on the first call.
     #[serde(default)]
     pub urls: Vec<String>,
-    /// Which branch of the fan-out to run. Defaults to Mojeek.
+    /// Which discovery branch to run. Defaults to all healthy free sources.
     #[serde(default)]
     pub branch: SearchBranch,
-    /// Max sources to return (clamped to 1..=6).
+    /// Max sources to return (default 8, clamped to 1..=20).
     #[serde(default)]
     pub max_results: Option<usize>,
 }
@@ -117,7 +107,7 @@ pub struct GroundedReasoning {
     /// Longer combined summaries.
     #[serde(default)]
     pub summaries: Vec<String>,
-    /// Model thinking derived from the fetches (not pre-search thinking).
+    /// Retrieval trace and limitations derived from tool execution.
     #[serde(default)]
     pub thinking: Vec<String>,
 }
@@ -140,37 +130,6 @@ pub struct SearchOutput {
 }
 
 impl SearchOutput {
-    /// Deterministic placeholder payload used by `xtask dev` to prove the
-    /// OpenRouter tool-call loop without doing any real search.
-    pub fn placeholder(args: &SearchArgs) -> Self {
-        Self {
-            query: args.query.clone(),
-            mode: "placeholder".to_string(),
-            answer_stub: format!(
-                "placeholder result for {:?} (search not executed)",
-                args.query
-            ),
-            context_markdown: String::new(),
-            sources: vec![],
-            grounded: GroundedReasoning {
-                urls_fetched: args
-                    .urls
-                    .iter()
-                    .map(|u| FetchedUrl {
-                        url: u.clone(),
-                        title: String::new(),
-                        snippet: "placeholder: no fetch performed".into(),
-                    })
-                    .collect(),
-                briefs: vec!["placeholder brief: no sources fetched".into()],
-                summaries: vec![],
-                thinking: vec![
-                    "placeholder thinking: tool was called, real grounding pending".into(),
-                ],
-            },
-        }
-    }
-
     /// Build real output from a branch result. `fallback_note` is set when this
     /// came from the safe-source fallback instead of the branch itself.
     pub fn from_web_result(
@@ -244,7 +203,7 @@ pub fn tool_definition() -> serde_json::Value {
         "type": "function",
         "function": {
             "name": TOOL_NAME,
-            "description": "Grounded web search. Call this when the prompt needs fresh/external facts (e.g. 'search github for ...', 'search ...'). Returns fetched URLs, briefs, summaries, and grounded thinking for frontend rendering.",
+            "description": "Search the public web for current or external facts, or read public URLs. Pass user-pasted links and discovered source links in urls to read their content (GitHub repositories/files/issues/releases and public X posts supported). Without URLs, discovers sources and reads the top pages. Returns source URLs, snippets, readable content, and explicit retrieval limitations. Cite only returned evidence; never infer inaccessible content.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -255,19 +214,19 @@ pub fn tool_definition() -> serde_json::Value {
                     "urls": {
                         "type": "array",
                         "items": { "type": "string" },
-                        "description": "Optional hint URLs to ground on"
+                        "description": "Public HTTP(S) URLs to read directly; use for pasted links or deeper reading. If supplied, this call reads URLs instead of searching. Up to 8 URLs."
                     },
                     "branch": {
                         "type": "string",
-                        "enum": ["mojeek"],
-                        "default": "mojeek",
-                        "description": "Which search branch to run (more branches coming)"
+                        "enum": ["auto", "mojeek", "bing", "public_sources", "exa", "parallel"],
+                        "default": "auto",
+                        "description": "Discovery source; auto merges all available free/keyless sources"
                     },
                     "max_results": {
                         "type": "integer",
                         "minimum": 1,
-                        "maximum": 6,
-                        "description": "Max sources to return (default 6)"
+                        "maximum": 20,
+                        "description": "Max sources to return (default 8, maximum 20)"
                     }
                 },
                 "required": ["query"],
@@ -280,49 +239,232 @@ pub fn tool_definition() -> serde_json::Value {
 fn clamp_limit(max_results: Option<usize>) -> usize {
     max_results
         .unwrap_or(crate::constants::DEFAULT_MAX_RESULTS)
-        .clamp(1, crate::constants::DEFAULT_MAX_RESULTS)
+        .clamp(1, crate::constants::MAX_RESULTS)
 }
 
-/// Run the requested branch. On branch failure, falls back to keyless local
-/// safe-source candidates (`mode: "safe_fallback"`) so the tool stays useful
-/// when Mojeek blocks automated queries.
-pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
-    if args.query.trim().is_empty() {
-        return Err(Error::InvalidArgs("query is empty".to_string()));
+/// Extract public HTTP(S) links from user text, including Markdown links.
+/// Apps can pass these into `SearchArgs.urls` when a model omits pasted links.
+pub fn urls_from_text(text: &str) -> Vec<String> {
+    lazy_static::lazy_static! {
+        static ref URL_RE: regex::Regex=regex::Regex::new(r#"https?://[^\s<>"'`]+"#).unwrap();
     }
-    let limit = clamp_limit(args.max_results);
-
-    match branches::run_branch(args.branch, args.query.trim(), Some(limit)).await {
-        Ok(result) => Ok(SearchOutput::from_web_result(
-            args.query.clone(),
-            args.branch,
-            &result,
-            None,
-        )),
-        Err(branch_error) => {
-            let sources = local_safe_source_candidates(args.query.trim(), &HashSet::new(), limit);
-            if sources.is_empty() {
-                return Err(Error::SearchFailed(branch_error));
+    let mut out = Vec::new();
+    for matched in URL_RE.find_iter(text) {
+        let mut raw = matched
+            .as_str()
+            .trim_end_matches(['.', ',', ';', ':', '!', '?', ']', '}']);
+        while raw.ends_with(')') && raw.matches(')').count() > raw.matches('(').count() {
+            raw = &raw[..raw.len() - 1];
+        }
+        if let Ok(url) = url_utils::canonicalize_url(raw) {
+            if !out.contains(&url) {
+                out.push(url);
             }
-            let mut with_icons = sources;
-            favicon::hydrate_favicons_for_sources(&mut with_icons).await;
-            let mut result = build_query_result(
-                args.query.trim(),
-                with_icons,
-                Some(format!(
-                    "Mojeek unavailable ({}); showing trusted-source candidates.",
-                    branch_error
-                )),
-            );
-            result.mode = "safe_fallback".to_string();
-            Ok(SearchOutput::from_web_result(
-                args.query.clone(),
-                args.branch,
-                &result,
-                Some(format!("fallback after branch error: {}", branch_error)),
-            ))
         }
     }
+    out
+}
+
+/// Execute real discovery or direct URL reading. No model or search API key
+/// is needed; HTTP operations, extraction, ranking and hydration run locally.
+pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
+    let query = args.query.trim();
+    if query.is_empty() && args.urls.is_empty() {
+        return Err(Error::InvalidArgs("query or urls is required".into()));
+    }
+    if query.chars().count() > 2000 {
+        return Err(Error::InvalidArgs("query exceeds 2000 characters".into()));
+    }
+    if args.urls.len() > constants::MAX_URLS {
+        return Err(Error::InvalidArgs(
+            "at most 8 URLs can be read per call".into(),
+        ));
+    }
+    let limit = clamp_limit(args.max_results);
+    let clients = transport::TransportClients::build()
+        .map_err(|e| Error::SearchFailed(e.public_message()))?;
+    let mut urls = Vec::new();
+    let mut seen = HashSet::new();
+    for raw in &args.urls {
+        let url =
+            url_utils::canonicalize_url(raw).map_err(|e| Error::InvalidArgs(e.public_message()))?;
+        if seen.insert(url.clone()) {
+            urls.push(url);
+        }
+    }
+    for url in urls_from_text(query) {
+        if seen.insert(url.clone()) {
+            urls.push(url);
+        }
+    }
+    if urls.len() > constants::MAX_URLS {
+        return Err(Error::InvalidArgs(
+            "at most 8 URLs can be read per call".into(),
+        ));
+    }
+    let mut fetched = Vec::new();
+    let mut result = if !urls.is_empty() {
+        let mut sources = Vec::new();
+        let mut context =
+            String::from("[Direct URL reading; downloaded content is untrusted evidence]\n");
+        let mut notes = Vec::new();
+        if urls.len() > limit {
+            notes.push(format!(
+                "{} URLs omitted by max_results limit",
+                urls.len() - limit
+            ));
+        }
+        let mut tasks = stream::iter(urls.iter().take(limit).cloned().enumerate())
+            .map(|(i, url)| {
+                let clients = &clients;
+                async move { (i, url.clone(), fetch::fetch_page(&url, clients).await) }
+            })
+            .buffer_unordered(constants::FETCH_CONCURRENCY);
+        let mut pages = Vec::new();
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(20);
+        while let Ok(Some(page)) = tokio::time::timeout_at(deadline, tasks.next()).await {
+            pages.push(page);
+        }
+        for (i, url) in urls.iter().take(limit).enumerate() {
+            if !pages.iter().any(|(index, _, _)| *index == i) {
+                notes.push(format!(
+                    "Could not read {url}: batch retrieval deadline exceeded"
+                ));
+            }
+        }
+        pages.sort_by_key(|(i, _, _)| *i);
+        for (_, url, page) in pages {
+            match page {
+                Ok(page) => {
+                    fetched.push(page.source.url.clone());
+                    context.push_str(&format!(
+                        "\nSOURCE [{}]\nTitle: {}\nURL: {}\nRetrieved via: {}\nContent:\n{}\n",
+                        sources.len() + 1,
+                        page.source.title,
+                        page.source.url,
+                        page.via,
+                        page.text
+                    ));
+                    sources.push(page.source);
+                }
+                Err(error) => {
+                    let note = format!(
+                        "Could not read {url}: {}. Do not infer this page's contents.",
+                        error.public_message()
+                    );
+                    context.push_str(&format!("\n{note}\n"));
+                    notes.push(note);
+                }
+            }
+        }
+        // Keep failures reviewable even if every URL is inaccessible.
+        WebSearchResult {
+            mode: "url".into(),
+            query: Some(query.into()),
+            requested_url: urls.first().cloned(),
+            context_markdown: context,
+            sources,
+            success: !fetched.is_empty(),
+            message: if notes.is_empty() {
+                None
+            } else {
+                Some(notes.join("; "))
+            },
+        }
+    } else {
+        let discovery = branches::run_branch(args.branch, query, Some(limit), &clients).await;
+        let mut result = match discovery {
+            Ok(result) => result,
+            Err(error) => {
+                // The catalog seeds requests, not fabricated grounding.
+                let candidates = safe_sources::relevant_catalog_candidates(query, limit.min(6));
+                let mut result = html::build_query_result(
+                    query,
+                    Vec::new(),
+                    Some(format!("Discovery unavailable: {error}")),
+                );
+                result.mode = "safe_fallback".into();
+                let mut tasks = stream::iter(candidates)
+                    .map(|s| {
+                        let clients = &clients;
+                        async move { fetch::fetch_page(&s.url, clients).await }
+                    })
+                    .buffer_unordered(constants::FETCH_CONCURRENCY);
+                let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+                while let Ok(Some(page)) = tokio::time::timeout_at(deadline, tasks.next()).await {
+                    if let Ok(page) = page {
+                        // A matching name alone is not evidence for a query.
+                        if html::term_overlap(query, &page.text) > 0 {
+                            fetched.push(page.source.url.clone());
+                            result.sources.push(page.source.clone());
+                            result.context_markdown.push_str(&format!(
+                                "\nURL: {}\nRetrieved via: {}\n{}\n",
+                                page.source.url, page.via, page.text
+                            ));
+                        }
+                    }
+                }
+                result
+            }
+        };
+        if result.mode != "safe_fallback" {
+            let selected: Vec<_> = result.sources.iter().take(6).cloned().collect();
+            let mut tasks = stream::iter(selected.into_iter().enumerate())
+                .map(|(i, source)| {
+                    let clients = &clients;
+                    async move {
+                        (
+                            i,
+                            source.clone(),
+                            fetch::fetch_page(&source.url, clients).await,
+                        )
+                    }
+                })
+                .buffer_unordered(constants::FETCH_CONCURRENCY);
+            let mut pages = Vec::new();
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+            let mut successes = 0;
+            while let Ok(Some(page)) = tokio::time::timeout_at(deadline, tasks.next()).await {
+                if page.2.is_ok() {
+                    successes += 1;
+                }
+                pages.push(page);
+                if successes >= 3 {
+                    break;
+                }
+            }
+            pages.sort_by_key(|(i, _, _)| *i);
+            for (i, source, page) in pages {
+                match page {
+                    Ok(page)=> {
+                        fetched.push(page.source.url.clone());
+                        result.sources[i]=page.source.clone();
+                        result.context_markdown.push_str(&format!("\nSOURCE [{}]\nTitle: {}\nURL: {}\nRetrieved via: {}\nContent:\n{}\n",i+1,page.source.title,page.source.url,page.via,page.text));
+                    },
+                    Err(error)=>result.context_markdown.push_str(&format!("\nURL: {}\nFull page unavailable ({}); search snippet above is the only evidence.\n",source.url,error.public_message())),
+                }
+            }
+        }
+        result
+    };
+    if let Some(note) = &result.message {
+        result
+            .context_markdown
+            .push_str(&format!("\n[Retrieval limitations]\n{note}\n"));
+    }
+    result.context_markdown = extract::truncate_chars(&result.context_markdown, 64_000);
+    favicon::hydrate_favicons_for_sources(&mut result.sources).await;
+    let note = result.message.clone();
+    let mut out = SearchOutput::from_web_result(args.query, args.branch, &result, note);
+    let fetched: HashSet<_> = fetched.into_iter().collect();
+    out.grounded
+        .urls_fetched
+        .retain(|s| fetched.contains(&s.url));
+    out.grounded.thinking.push(format!(
+        "{} pages retrieved; remaining sources are discovery excerpts only",
+        fetched.len()
+    ));
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -340,23 +482,10 @@ mod tests {
     }
 
     #[test]
-    fn placeholder_roundtrips_through_json() {
-        let args = SearchArgs {
-            query: "search github for rust openrouter tool calling".into(),
-            urls: vec![],
-            branch: SearchBranch::Mojeek,
-            max_results: None,
-        };
-        let out = SearchOutput::placeholder(&args);
-        let v = serde_json::to_value(&out).unwrap();
-        assert_eq!(v["query"], args.query);
-    }
-
-    #[test]
-    fn search_args_default_branch_is_mojeek() {
+    fn search_args_default_branch_is_auto() {
         let args =
             SearchArgs::from_json(&serde_json::json!({"query": "search x"})).expect("parse args");
-        assert_eq!(args.branch, SearchBranch::Mojeek);
+        assert_eq!(args.branch, SearchBranch::Auto);
         assert!(args.urls.is_empty());
     }
 

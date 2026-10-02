@@ -1,0 +1,40 @@
+[
+  {
+    "case": "ipv6_private",
+    "sources": 0,
+    "pages_read": 0,
+    "limitations": [
+      "branch=auto mode=url results=0",
+      "Could not read http://[::1]:8080/private: [blocked_target] Blocked URL: non-public IP target. Do not infer this page's contents.",
+      "0 pages retrieved; remaining sources are discovery excerpts only"
+    ],
+    "cli_wall_ms_including_cargo": 20227
+  },
+  {
+    "case": "credentials",
+    "exit_code": 1,
+    "error": "Error: invalid tool args: [invalid_url] URL credentials are not allowed"
+  },
+  {
+    "case": "mapped_ipv6",
+    "sources": 0,
+    "pages_read": 0,
+    "limitations": [
+      "branch=auto mode=url results=0",
+      "Could not read http://[::ffff:7f00:1]/: [blocked_target] Blocked URL: non-public IP target. Do not infer this page's contents.",
+      "0 pages retrieved; remaining sources are discovery excerpts only"
+    ],
+    "cli_wall_ms_including_cargo": 1078
+  },
+  {
+    "case": "result_limit",
+    "sources": 1,
+    "pages_read": 1,
+    "limitations": [
+      "branch=auto mode=url results=1",
+      "1 URLs omitted by max_results limit",
+      "1 pages retrieved; remaining sources are discovery excerpts only"
+    ],
+    "cli_wall_ms_including_cargo": 2192
+  }
+]

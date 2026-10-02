@@ -11,9 +11,13 @@ categories = ["api-bindings"]
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate", "charset"] }
+dom_smoothie = "0.18.2"
+scraper = "0.24"
+roxmltree = "0.21"
 tokio = { version = "1", features = ["rt", "time", "net", "macros"] }
 url = "2"
+percent-encoding = "2"
 regex = "1"
 lazy_static = "1"
 base64 = "0.22"

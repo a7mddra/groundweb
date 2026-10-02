@@ -1,0 +1,219 @@
+{
+  "model_runs": [
+    {
+      "answer": "# Axum vs Actix-web: Routing & Middleware (from README evidence)\n\n## Sources\n- **tokio-rs/axum**: [https://github.com/tokio-rs/axum](https://github.com/tokio-rs/axum) (27,326 stars, MIT)\n- **actix/actix-web**: [https://github.com/actix/actix-web](https://github.com/actix/actix-web) (24,849 stars, Apache-2.0)\n\n## Routing\n\n| | **Axum** | **Actix-web** |\n|---|---|---|\n| Style | Macro-free API using `routing::{get, post}` combinators + `Router` builder | Powerful request routing with **optional macros** (`#[get(\"/hello/{name}\")]`) |\n| Example (README) | `.route(\"/\", get(root)).route(\"/users\", post(create_user))` | `#[get(\"/hello/{name}\")]\\nasync fn greet(name: web::Path<String>) -> impl Responder { \u2026 }` |\n| Philosophy | Emphasizes \"macro free API\" and declarative request parsing via **extractors** | Supports both macro and non-macro dispatch via `App::new().service(...)` |\n\nAxum's README explicitly highlights \"Route requests to handlers with a macro free API\" and declarative parsing via extractors as a high-level feature. Actix-web calls out \"Powerful request routing with optional macros\" in its Features section.\n\n## Middleware\n\n| | **Axum** | **Actix-web** |\n|---|---|---|\n| System | **Uses `tower::Service`** \u2014 no own middleware system | Built-in **Middlewares** (Logger, Session, CORS, etc.) |\n| Ecosystem | Leverages the full [`tower`] and [`tower-http`] ecosystem; timeouts, tracing, compression, authorization \"for free\" | Provides middleware list directly; links to `/docs/middleware/` |\n| Interop | Shares middleware with apps written using [`hyper`] or [`tonic`] | Integrates with `awc` HTTP client |\n\nAxum's README explicitly states: *\"axum doesn't have its own middleware system but instead uses `tower::Service`. This means axum gets timeouts, tracing, compression, authorization, and more, for free. It also enables you to share middleware with applications written using `hyper` or `tonic`.\"*\n\n## Key takeaway (evidence-based)\n- **Routing**: Axum favors a combinatorial, macro-free `Router` builder with extractors; Actix-web offers a powerful router with optional declarative macros.\n- **Middleware**: Axum delegates entirely to the `tower::Service` ecosystem (reuse across hyper/tonic); Actix-web bundles its own middleware set (Logger, Session, CORS, etc.).\n\nBoth repos are built on Tokio and target high performance; Axum positions itself as a thin layer over `hyper`, while Actix-web claims one of the fastest frameworks per TechEmpower benchmarks.",
+      "cited_source_urls": [
+        "https://github.com/actix/actix-web",
+        "https://github.com/tokio-rs/axum"
+      ],
+      "elapsed_ms": 5413,
+      "iterations": 2,
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "pages_read": 2,
+      "prompt": "Read https://github.com/tokio-rs/axum and https://github.com/actix/actix-web. Compare their routing and middleware using evidence from the READMEs. Cite both repos.",
+      "retrieval_ms": 0,
+      "sources": 2,
+      "tool_calls": 1,
+      "usage": [
+        {
+          "completion_tokens": 86,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 47
+          },
+          "cost": 0,
+          "cost_details": {
+            "upstream_inference_completions_cost": 0,
+            "upstream_inference_cost": 0,
+            "upstream_inference_prompt_cost": 0
+          },
+          "is_byok": false,
+          "prompt_tokens": 659,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 745
+        },
+        {
+          "completion_tokens": 705,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 26
+          },
+          "cost": 0,
+          "cost_details": {
+            "upstream_inference_completions_cost": 0,
+            "upstream_inference_cost": 0,
+            "upstream_inference_prompt_cost": 0
+          },
+          "is_byok": false,
+          "prompt_tokens": 4412,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 64,
+            "video_tokens": 0
+          },
+          "total_tokens": 5117
+        }
+      ]
+    },
+    {
+      "answer": "## Results\n\n### X post: `https://x.com/jack/status/20`\n\nExact post text:\n\n> just setting up my twttr\n\nThis is Jack Dorsey's original first-ever tweet, retrieved successfully via X's public oEmbed endpoint.\n\n### GitHub: `tokio-rs/axum` releases \u2014 two recent changes\n\nFrom the latest release **axum v0.8.9** (published 2026-04-14):\n\n- **Added:** `WebSocketUpgrade::{requested_protocols, set_selected_protocol}` for more flexible subprotocol selection ([#3597])\n- **Changed:** Update minimum Rust version to 1.80 ([#3620])\n- **Fixed:** Set connect endpoint on correct field in `MethodRouter` ([#3656])\n- **Fixed:** Return specific error message when multipart body limit is exceeded ([#3611])\n\nSources:\n- X post: [https://x.com/jack/status/20](https://x.com/jack/status/20) (retrieved via X public oEmbed \u2014 post text only, no thread/timeline)\n- Axum releases: [https://github.com/tokio-rs/axum/releases](https://github.com/tokio-rs/axum/releases)\n\n### Accessibility flags\n\n- The X post was retrieved only as plain text via oEmbed; no thread context, media, or engagement metrics were available.\n- GitHub release content was fully accessible.",
+      "cited_source_urls": [
+        "https://github.com/tokio-rs/axum/releases",
+        "https://x.com/jack/status/20"
+      ],
+      "elapsed_ms": 4018,
+      "iterations": 2,
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "pages_read": 2,
+      "prompt": "Read https://x.com/jack/status/20 and https://github.com/tokio-rs/axum/releases. Report the exact post text and two recent release changes. Cite the sources and flag anything inaccessible.",
+      "retrieval_ms": 1,
+      "sources": 2,
+      "tool_calls": 1,
+      "usage": [
+        {
+          "completion_tokens": 98,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 46
+          },
+          "cost": 0,
+          "cost_details": {
+            "upstream_inference_completions_cost": 0,
+            "upstream_inference_cost": 0,
+            "upstream_inference_prompt_cost": 0
+          },
+          "is_byok": false,
+          "prompt_tokens": 662,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 0,
+            "video_tokens": 0
+          },
+          "total_tokens": 760
+        },
+        {
+          "completion_tokens": 399,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 72
+          },
+          "cost": 0,
+          "cost_details": {
+            "upstream_inference_completions_cost": 0,
+            "upstream_inference_cost": 0,
+            "upstream_inference_prompt_cost": 0
+          },
+          "is_byok": false,
+          "prompt_tokens": 1930,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 64,
+            "video_tokens": 0
+          },
+          "total_tokens": 2329
+        }
+      ]
+    },
+    {
+      "answer": "## Reqwest `ClientBuilder` Timeout: Total Request vs Connect Timeout (with rustls)\n\n### The three timeout methods\n\nReqwest's `ClientBuilder` exposes three distinct timeout settings that cover different phases of an HTTP request. Below is the definitive documentation (all sourced from the latest `docs.rs/reqwest`).\n\n### 1. `timeout()` \u2014 total request deadline\n\n> \"Enables a total request timeout. The timeout is applied from when the request starts connecting until the response body has finished. Also considered a total deadline. Default is no timeout.\"\n> \u2014 [docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.timeout](https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.timeout)\n\nThis is a **wall-clock deadline for the entire request**: DNS resolution + TCP connect + TLS handshake (including rustls certificate verification and key exchange) + sending the request body + waiting for response headers + streaming the response body. If any single phase exceeds the remaining budget, the request fails with a timeout error.\n\n### 2. `connect_timeout()` \u2014 TCP/TLS connection phase only\n\n> \"Set a timeout for only the connect phase of a Client. Default is `None`. Note: This requires the futures be executed in a tokio runtime with a tokio timer enabled.\"\n> \u2014 [docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.connect_timeout](https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.connect_timeout)\n\nThis covers **only the connection establishment**: TCP handshake + TLS handshake (rustls). It does NOT cover reading the response body. This is what you set when you want to fail fast on a stalled TCP/TLS negotiation without affecting the rest of the request.\n\n### 3. `read_timeout()` \u2014 per-read stall detection\n\n> \"Enables a read timeout. The timeout applies to each read operation, and resets after a successful read. This is more appropriate for detecting stalled connections when the size isn't known beforehand. Default is no timeout.\"\n> \u2014 [docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.read_timeout](https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.read_timeout)\n\nThis resets after every successful read and is useful for detecting a stalled response stream, not the overall request.\n\n### Relationship diagram\n\n```\nrequest.start()\n   \u2502\n   \u251c\u2500 connect_timeout \u2500\u2500\u2510  (TCP + TLS/rustls handshake)\n   \u2502                    \u2502\n   \u251c\u2500 read_timeout \u2500\u2500\u2500\u2500\u2500\u2524  (per-read, resets after each read)\n   \u2502                    \u2502\n   \u2514\u2500 timeout (total) \u2500\u2500\u2518  (connect + read + body streaming)\n```\n\n### Practical example with rustls\n\nSince reqwest v0.13, **rustls is the default TLS backend** [seanmonstar.com/blog/reqwest-v013-rustls-default](https://seanmonstar.com/blog/reqwest-v013-rustls-default/), so these timeouts govern rustls connections automatically. A typical configuration:\n\n```rust\nuse std::time::Duration;\n\nlet client = reqwest::Client::builder()\n    .timeout(Duration::from_secs(30))          // total deadline\n    .connect_timeout(Duration::from_secs(5))   // TCP + TLS only\n    .build()?;\n```\n\n### Key behavior notes\n\n- If **only** `timeout()` is set (default `connect_timeout` is `None`), the total deadline still covers the connect phase \u2014 but you lose the ability to fail fast on a slow TCP/TLS handshake separately from a slow response body.\n- The blocking `ClientBuilder` (feature `blocking`) has a **30-second default** for `timeout()`, while the async version defaults to `None` [docs.rs/reqwest/latest/reqwest/blocking/struct.ClientBuilder.html](https://docs.rs/reqwest/latest/reqwest/blocking/struct.ClientBuilder.html).\n- `connect_timeout` requires a tokio runtime with a timer enabled [docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.connect_timeout](https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.connect_timeout).\n\n### Summary\n\n| Method | Scope | Default |\n|---|---|---|\n| `timeout()` | Connect + read + body (total deadline) | `None` (async), 30s (blocking) |\n| `connect_timeout()` | TCP + TLS handshake only | `None` |\n| `read_timeout()` | Per-read on response body | `None` |\n\nThe presence of rustls as the default TLS backend means the TLS handshake is part of **both** `connect_timeout` and `timeout`, so setting both avoids a slow rustls certificate verification from consuming the entire total deadline before any HTTP data is sent.",
+      "cited_source_urls": [
+        "https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html",
+        "https://docs.rs/reqwest/latest/reqwest/blocking/struct.ClientBuilder.html",
+        "https://seanmonstar.com/blog/reqwest-v013-rustls-default/",
+        "https://docs.rs/reqwest"
+      ],
+      "elapsed_ms": 38989,
+      "iterations": 3,
+      "model": "inclusionai/ling-3.0-flash-sante:free",
+      "pages_read": 6,
+      "prompt": "Search for rust reqwest ClientBuilder timeout rustls, read relevant documentation, and explain total request versus connect timeout with citations.",
+      "retrieval_ms": 19225,
+      "sources": 23,
+      "tool_calls": 4,
+      "usage": [
+        {
+          "completion_tokens": 105,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 54
+          },
+          "cost": 0,
+          "cost_details": {
+            "upstream_inference_completions_cost": 0,
+            "upstream_inference_cost": 0,
+            "upstream_inference_prompt_cost": 0
+          },
+          "is_byok": false,
+          "prompt_tokens": 642,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 64,
+            "video_tokens": 0
+          },
+          "total_tokens": 747
+        },
+        {
+          "completion_tokens": 154,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 81
+          },
+          "cost": 0,
+          "cost_details": {
+            "upstream_inference_completions_cost": 0,
+            "upstream_inference_cost": 0,
+            "upstream_inference_prompt_cost": 0
+          },
+          "is_byok": false,
+          "prompt_tokens": 32115,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 64,
+            "video_tokens": 0
+          },
+          "total_tokens": 32269
+        },
+        {
+          "completion_tokens": 1311,
+          "completion_tokens_details": {
+            "audio_tokens": 0,
+            "image_tokens": 0,
+            "reasoning_tokens": 256
+          },
+          "cost": 0,
+          "cost_details": {
+            "upstream_inference_completions_cost": 0,
+            "upstream_inference_cost": 0,
+            "upstream_inference_prompt_cost": 0
+          },
+          "is_byok": false,
+          "prompt_tokens": 62693,
+          "prompt_tokens_details": {
+            "audio_tokens": 0,
+            "cache_write_tokens": 0,
+            "cached_tokens": 32064,
+            "video_tokens": 0
+          },
+          "total_tokens": 64004
+        }
+      ]
+    }
+  ],
+  "note": "Model timing includes network and inference. These tasks shared the process and page cache with an earlier retrieval benchmark."
+}

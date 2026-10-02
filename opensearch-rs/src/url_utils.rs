@@ -34,10 +34,15 @@ fn is_unicast_link_local_v6(v6: &Ipv6Addr) -> bool {
     (v6.segments()[0] & 0xffc0) == 0xfe80
 }
 
-fn is_public_ip(ip: IpAddr) -> bool {
+pub(crate) fn is_public_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => {
-            !v4.is_private()
+            let [a, b, _, _] = v4.octets();
+            a != 0
+                && a < 224
+                && !(a == 100 && (64..=127).contains(&b))
+                && !(a == 198 && (b == 18 || b == 19))
+                && !v4.is_private()
                 && !v4.is_loopback()
                 && !v4.is_link_local()
                 && !v4.is_multicast()
@@ -46,6 +51,9 @@ fn is_public_ip(ip: IpAddr) -> bool {
                 && !v4.is_unspecified()
         }
         IpAddr::V6(v6) => {
+            if let Some(v4) = v6.to_ipv4_mapped() {
+                return is_public_ip(IpAddr::V4(v4));
+            }
             !v6.is_loopback()
                 && !v6.is_unspecified()
                 && !v6.is_multicast()
@@ -57,6 +65,15 @@ fn is_public_ip(ip: IpAddr) -> bool {
 }
 
 pub(crate) async fn ensure_public_target(url: &Url) -> Result<(), SearchError> {
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err(SearchError::fatal(
+            SearchFailureClass::BlockedTarget,
+            "Only public HTTP(S) URLs without credentials are allowed",
+        ));
+    }
     let host = url.host_str().ok_or_else(|| {
         SearchError::fatal(
             SearchFailureClass::BlockedTarget,
@@ -76,7 +93,23 @@ pub(crate) async fn ensure_public_target(url: &Url) -> Result<(), SearchError> {
             "Blocked URL: unknown port",
         )
     })?;
-    let lookup = tokio::net::lookup_host((host, port)).await.map_err(|e| {
+    if let Ok(ip) = host.trim_matches(['[', ']']).parse::<IpAddr>() {
+        return if is_public_ip(ip) {
+            Ok(())
+        } else {
+            Err(SearchError::fatal(
+                SearchFailureClass::BlockedTarget,
+                "Blocked URL: non-public IP target",
+            ))
+        };
+    }
+    let lookup = tokio::time::timeout(
+        std::time::Duration::from_secs(4),
+        tokio::net::lookup_host((host, port)),
+    )
+    .await
+    .map_err(|_| SearchError::retriable(SearchFailureClass::Dns, "DNS lookup timed out"))?
+    .map_err(|e| {
         SearchError::retriable(SearchFailureClass::Dns, format!("DNS lookup failed: {}", e))
     })?;
 
@@ -143,8 +176,29 @@ pub(crate) fn canonicalize_url(raw: &str) -> Result<String, SearchError> {
             "Blocked URL: host is required",
         ));
     }
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(SearchError::fatal(
+            SearchFailureClass::InvalidUrl,
+            "URL credentials are not allowed",
+        ));
+    }
 
     parsed.set_fragment(None);
+    let pairs: Vec<(String, String)> = parsed
+        .query_pairs()
+        .filter(|(key, _)| {
+            let key = key.to_ascii_lowercase();
+            !key.starts_with("utm_")
+                && !matches!(key.as_str(), "gclid" | "fbclid" | "mc_cid" | "mc_eid")
+        })
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    if parsed.query().is_some() {
+        parsed.set_query(None);
+        if !pairs.is_empty() {
+            parsed.query_pairs_mut().extend_pairs(pairs);
+        }
+    }
     if (parsed.scheme() == "https" && parsed.port() == Some(443))
         || (parsed.scheme() == "http" && parsed.port() == Some(80))
     {
@@ -152,8 +206,4 @@ pub(crate) fn canonicalize_url(raw: &str) -> Result<String, SearchError> {
     }
 
     Ok(parsed.to_string())
-}
-
-pub(crate) fn is_remote_http_url(value: &str) -> bool {
-    value.starts_with("http://") || value.starts_with("https://")
 }

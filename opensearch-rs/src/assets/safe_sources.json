@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-09-25",
+  "reviewed_at": "2026-10-03",
   "safe_sources": [
     {
       "category": "official_technology",
@@ -207,6 +207,40 @@
           "name": "Lobsters",
           "domain": "lobste.rs",
           "rss": "https://lobste.rs/rss"
+        }
+      ]
+    },
+    {
+      "category": "development_reference",
+      "sites": [
+        {
+          "name": "GitHub Repositories",
+          "domain": "github.com"
+        },
+        {
+          "name": "Rust Crate Documentation",
+          "domain": "docs.rs"
+        },
+        {
+          "name": "Rust Package Registry",
+          "domain": "crates.io"
+        },
+        {
+          "name": "Hugging Face Models and Papers",
+          "domain": "huggingface.co"
+        }
+      ]
+    },
+    {
+      "category": "research_reference",
+      "sites": [
+        {
+          "name": "arXiv",
+          "domain": "arxiv.org"
+        },
+        {
+          "name": "ACL Anthology",
+          "domain": "aclanthology.org"
         }
       ]
     }

@@ -1,45 +1,93 @@
 # opensearch
 
-Free, local, best-effort grounded web-search tool for Rust AI apps, wired through **OpenRouter tool calling** (OpenAI-compatible `tools` array).
+Free, best-effort web grounding for Rust apps and OpenRouter tool calling. HTTP retrieval, parsing, ranking, caching and favicon hydration run on the user's machine. Web indexes and source websites remain remote. There is no search API key, browser runtime, Python sidecar or paid search fallback.
 
-Any Rust app using an OpenRouter provider can attach the exported tool definition; when the model detects a prompt needs search (e.g. “search github for …”, “search xxxx …”), it calls the tool, receives fetched URLs + briefs + summaries + grounded thinking, and generates the final response from those results. Frontends render the `GroundedReasoning` trace + per-source favicons.
+`web_search` now executes real searches **and reads pasted URLs**. The default `auto` branch merges healthy free sources. Frontends keep the same `CitationSource` and `GroundedReasoning` shapes.
 
-> Status: **Mojeek branch is live.** `execute()` runs the Mojeek query branch (keyless, free) with a keyless safe-source fallback. No DuckDuckGo anywhere, no Gemini API — the fallback URL suggester speaks OpenRouter chat-completions.
+## Discovery branches
 
-## Layout
+| Branch | Source | Access |
+| --- | --- | --- |
+| `auto` | Merge the branches below, deduplicate, rerank, diversify hosts | Default |
+| `mojeek` | Mojeek search HTML | Keyless; may block automation |
+| `bing` | Bing search RSS | Keyless; may return empty/limited results |
+| `public_sources` | Wikipedia, GitHub repositories/issues, Hacker News, Stack Exchange, arXiv, crates.io, relevant catalog RSS/Atom feeds | Direct public endpoints; selected by query topic |
+| `exa` | Exa's anonymous hosted MCP search | Free/keyless, service-controlled limits |
+| `parallel` | Parallel's anonymous hosted MCP search | Free/keyless, service-controlled limits |
 
-- `opensearch-rs/src/lib.rs` — crate `opensearch`: `TOOL_NAME`, `tool_definition()`, `SearchArgs`, `SearchOutput`, `execute()`.
-- `opensearch-rs/src/branches.rs` — `SearchBranch` fan-out (`Mojeek` today; the real web scraper lands here next).
-- `opensearch-rs/src/mojeek.rs` — Mojeek query path. `fetch.rs` — allowlist URL fetch. `html.rs` — parse/rerank/page-text. `safe_sources.rs` + `assets/safe_sources.json` — trusted catalog + keyless fallback. `suggester.rs` — OpenRouter fallback-URL suggester. `favicon.rs` — GLOBAL favicon layer for all branches. `transport.rs` / `retry.rs` / `url_utils.rs` / `constants.rs` / `types.rs` — shared leaves.
-- `xtask/src/main.rs` — task runner: `build`, `doctor`, `fmt`, `dev`.
-- `.cargo/config.toml` — `cargo xtask` alias. `rust-toolchain.toml` — pinned stable + rustfmt/clippy.
+Exa and Parallel run search infrastructure remotely. Their anonymous tiers can change or rate-limit; they are never given search credentials and never upgraded to paid requests. Provider errors appear in the returned context. See [Exa's anonymous access documentation](https://github.com/exa-labs/exa-mcp-server) and [Parallel's free-tier documentation](https://github.com/parallel-web/search-mcp).
 
-## Quickstart
+More sources improve coverage, but source relevance, freshness and reading actual pages determine grounding quality. The tool prefers matching titles/snippets, agreement across branches, current Rust documentation and host diversity. It preserves meaningful URL parameters and removes fragments/tracking parameters. A catalog link alone is never treated as fetched evidence.
+
+## URL reading
+
+Supply `urls`, or embed HTTP(S) URLs in `query`. That call reads the URLs instead of performing discovery. A subsequent call without URLs searches normally.
+
+- GitHub repository: public metadata and README; `.git` repository URLs work.
+- GitHub `/blob/` file: raw file text.
+- GitHub issue/pull request: issue body and up to ten comments; this does not retrieve a PR diff.
+- GitHub releases, latest release, release tag: public release notes; lists are capped at five.
+- Public X/Twitter status: official oEmbed text, then best-effort public widget JSON. Profiles, timelines, protected/deleted posts and full threads are unsupported.
+- Wikipedia article: public article-text API, avoiding oversized page chrome.
+- Other pages: native Readability Markdown extraction with a static HTML fallback; text, Markdown, JSON and RSS/Atom are also readable.
+
+Failures retain whatever evidence is available, with explicit limitations. Search-discovered pages that fail retrieval keep their discovery excerpts. An inaccessible pasted URL contributes no fabricated source. `grounded.urls_fetched` includes only successfully retrieved pages; `sources` also includes discovery excerpts.
+
+## Use in an app
+
+```rust
+let tools = vec![opensearch::tool_definition()];
+// POST OpenRouter /chat/completions with tools and tool_choice: "auto".
+// When the model calls web_search, parse arguments and execute locally:
+let mut args = opensearch::SearchArgs::from_json(&tool_arguments)?;
+// Carry user-pasted links into the first call if the model omits them.
+args.urls.extend(opensearch::urls_from_text(user_prompt));
+args.urls.sort();
+args.urls.dedup();
+let output = opensearch::execute(args).await?;
+// Preserve the assistant's entire tool_calls array, then append each tool
+// result with the matching tool_call_id. Ask the model to cite returned URLs.
+```
+
+Carry pasted links only into the first call; subsequent calls should use the model's requested sources. Treat downloaded content as untrusted evidence. Send the model `context_markdown` and source titles/URLs/summaries; keep inline favicon bytes and duplicate UI traces out of its context. `xtask dev` demonstrates this complete loop.
+
+The result limit defaults to eight and accepts up to twenty. Search reads up to three pages, trying up to six candidates when earlier pages fail; URL mode accepts up to eight URLs and respects `max_results`. Keep `TOOL_NAME = "web_search"`, `CitationSource`, and `GroundedReasoning` stable in consumers. The old placeholder API has been removed.
+
+## Run locally
 
 ```sh
 cargo xtask doctor
 cargo xtask build
-cargo xtask dev --live --prompt "search rust openrouter tool calling"   # keyless, real Mojeek branch
-cp .env.example .env        # only needed for the OpenRouter model loop below
-cargo xtask dev --prompt "search github for rust openrouter tool calling examples and summarize the best approaches"
+cargo xtask dev --live --prompt "rust reqwest ClientBuilder timeout rustls"
+cargo xtask dev --live --url https://github.com/tokio-rs/axum --prompt "Read the README" --json
+cargo xtask dev --live --branch public_sources --prompt "retrieval augmented generation papers"
+
+# Only the model loop needs .env; retrieval is keyless.
+cp .env.example .env
+# Set OPENROUTER_API_KEY; select a currently available free tool-capable model.
+cargo xtask dev --model openrouter/free --prompt "Read https://github.com/tokio-rs/axum and cite its middleware design"
+
+# Manual live workloads, timing and source/page/icon counts:
+cargo xtask bench --repeat 2 --output benchmarks/local.json
+cargo xtask bench --model openrouter/free --output benchmarks/model.json
+cargo test --workspace
+cargo xtask build
 ```
 
-Attach in your app (OpenRouter chat completions):
+`OPENROUTER_MODEL` overrides the `openrouter/free` model-loop default. Existing `.env` files using `openrouter/auto` may select paid models; use an explicit free endpoint for zero-cost runs. The benchmark runner rejects paid model IDs. Anonymous model availability and shared rate limits still apply.
 
-```rust
-let tools = vec![opensearch::tool_definition()];
-// POST {base}/chat/completions { model, messages, tools, tool_choice: "auto" }
-// on tool_call name == opensearch::TOOL_NAME -> opensearch::execute(args).await
-```
+`cargo xtask fmt` formats changed Rust files; `--all` formats the workspace. `dev --live` bypasses the model; ordinary `dev` executes the real tool loop. `--branch`, `--max-results`, repeated `--url`, `--max-iters` and `--json` control manual runs.
 
-## xtask
+## Bounds and limitations
 
-- `cargo xtask build [--release]` — `cargo build --workspace`.
-- `cargo xtask doctor` — toolchain + layout checks; warns (never fails) on missing `OPENROUTER_API_KEY`.
-- `cargo xtask fmt [--all]` — default formats only git-changed `*.rs`; `--all` runs `cargo fmt --all`.
-- `cargo xtask dev [--prompt ...] [--model ...] [--base-url ...] [--max-iters N]` — OpenRouter tool-call loop with the placeholder tool (needs key). Add `--live [--max-results N]` for the real keyless Mojeek branch instead (no model involved).
+Discovery branches have a ten-second deadline. Public source jobs have four-second deadlines. Each page has a ten-second deadline, direct URL batches stop after twenty seconds, and favicon hydration has a five-second batch deadline. Pages use concurrency three; icons use four. Responses are capped at 1 MiB, readable text at 12,000 characters per page, and combined context at 64,000 characters. Page/icon caches are bounded to 64 entries, with five/ten-minute success TTLs. Blocks/rate limits trigger cooldowns; numeric `Retry-After` is honored where available.
 
-## Notes
+Every redirect is checked, credentials/non-HTTP URLs are rejected, and private/reserved IP targets are blocked. Direct DNS connections validate the actual resolved addresses; configured proxies must also be trusted to resolve public destinations correctly.
 
-- `SearchArgs.urls` hints are placeholder-trace-only for now; gated fetch lives in `fetch_url_from_allowed` (URL must come from a previous result in the turn).
-- `suggest_fallback_urls` needs an OpenRouter key + model; pair its output with `filter_suggested_urls_to_safe_sources` before fetching.
+There is no JavaScript execution, login, CAPTCHA bypass, paywall bypass, PDF/binary extraction or complete repository crawl. Direct search APIs have quotas; GitHub's unauthenticated REST/search limits are particularly small. News searches can include stale snippets, previews or prereleases. Short excerpts do not establish every claim an LLM makes; verify citations and dates. Public X widget JSON is undocumented and may change.
+
+Measured workloads and model limitations are recorded in [benchmarks/RESULTS.md](benchmarks/RESULTS.md).
+
+## Layout
+
+`opensearch-rs/` contains package `opensearch`; `xtask/` is the task runner. `branches.rs` is the single discovery dispatcher. `mojeek.rs`, `bing.rs`, `public_sources.rs`, and `mcp_search.rs` implement discovery. `fetch.rs` handles URL reading and site adapters; `extract.rs` handles native readability. `html.rs` ranks and normalizes result context. `safe_sources.rs` and `assets/safe_sources.json` select catalog seeds/feeds. `favicon.rs` is the shared public icon layer. `transport.rs`, `retry.rs`, `types.rs` and `url_utils.rs` are shared leaves. `suggester.rs` remains an optional OpenRouter URL suggestion helper; suggestions still require retrieval before grounding.

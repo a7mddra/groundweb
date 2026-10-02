@@ -1,11 +1,12 @@
 // Copyright 2026 a7mddra
 // SPDX-License-Identifier: Apache-2.0
 
-//! Transport layer shared by every search branch: direct-first HTTP with
-//! proxy fallback, capped streaming reads, and error classification.
+//! Shared pooled HTTP, honoring configured proxies with direct fallback,
+//! bounded reads and public-address validation on direct DNS connections.
 
 use futures_util::StreamExt;
 use reqwest::redirect::Policy;
+use std::sync::Arc;
 use std::time::Duration;
 
 use super::constants::{CONNECT_TIMEOUT_SECS, REQUEST_TIMEOUT_SECS};
@@ -19,6 +20,13 @@ pub(crate) struct TransportClients {
 
 impl TransportClients {
     pub(crate) fn build() -> Result<Self, SearchError> {
+        lazy_static::lazy_static! {
+            static ref CLIENTS: Result<TransportClients, SearchError> = TransportClients::new();
+        }
+        CLIENTS.clone()
+    }
+
+    fn new() -> Result<Self, SearchError> {
         let direct = build_client(true)?;
         let proxy = if has_proxy_env() {
             Some(build_client(false)?)
@@ -42,6 +50,30 @@ impl TransportClients {
             TransportRoute::Direct => Some(&self.direct),
             TransportRoute::Proxy => self.proxy.as_ref(),
         }
+    }
+}
+
+// Validate the addresses actually used by direct connections, including a
+// second DNS answer. Proxy destinations are also checked before sending.
+struct PublicResolver;
+impl reqwest::dns::Resolve for PublicResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let addresses: Vec<_> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
+            if addresses.is_empty()
+                || addresses
+                    .iter()
+                    .any(|a| !crate::url_utils::is_public_ip(a.ip()))
+            {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "DNS resolved to a non-public address",
+                )
+                .into());
+            }
+            Ok(Box::new(addresses.into_iter()) as reqwest::dns::Addrs)
+        })
     }
 }
 
@@ -75,7 +107,7 @@ fn build_client(no_proxy: bool) -> Result<reqwest::Client, SearchError> {
         .user_agent(user_agent());
 
     if no_proxy {
-        builder = builder.no_proxy();
+        builder = builder.no_proxy().dns_resolver(Arc::new(PublicResolver));
     }
 
     builder.build().map_err(|e| {
@@ -176,7 +208,7 @@ where
                 let has_next = idx + 1 < routes.len();
                 if route == TransportRoute::Proxy && has_next && can_fallback_to_direct(mapped.kind)
                 {
-                    println!(
+                    eprintln!(
                         "[WebSearch] transport={} failed [{}]: {}; retrying direct",
                         route.as_str(),
                         mapped.kind.as_str(),
@@ -224,9 +256,10 @@ pub(crate) async fn read_capped_response_body(
 
         total += chunk.len();
         if total > max_bytes {
-            let allowed = chunk.len().saturating_sub(total - max_bytes);
-            bytes.extend_from_slice(&chunk[..allowed]);
-            break;
+            return Err(SearchError::fatal(
+                SearchFailureClass::Parse,
+                format!("Response exceeded {max_bytes} bytes"),
+            ));
         }
         bytes.extend_from_slice(&chunk);
     }

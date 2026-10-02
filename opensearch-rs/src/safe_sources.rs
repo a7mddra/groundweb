@@ -149,6 +149,75 @@ pub fn local_safe_source_candidates(
     out
 }
 
+pub(crate) fn relevant_catalog_candidates(query: &str, limit: usize) -> Vec<CitationSource> {
+    let mut sites: Vec<_> = SAFE_SOURCES_DATA
+        .iter()
+        .flat_map(|category| {
+            category.sites.iter().filter_map(|site| {
+                let score = safe_source_relevance_score(query, &category.category, site);
+                if score <= 0 {
+                    return None;
+                }
+                Some((
+                    score,
+                    citation_source(
+                        site.name.clone(),
+                        make_safe_source_url(site)?,
+                        "Catalog seed; not yet fetched".into(),
+                    ),
+                ))
+            })
+        })
+        .collect();
+    sites.sort_by_key(|(score, _)| Reverse(*score));
+    sites
+        .into_iter()
+        .take(limit)
+        .map(|(_, source)| source)
+        .collect()
+}
+
+/// Pick only relevant feeds; a catalog homepage is never evidence of a fact.
+pub(crate) fn relevant_feed_candidates(query: &str, limit: usize) -> Vec<CitationSource> {
+    let terms = query_terms(query);
+    let lower = query.to_lowercase();
+    let mut feeds = Vec::new();
+    for category in SAFE_SOURCES_DATA.iter() {
+        for site in &category.sites {
+            let Some(rss) = site.rss.as_deref() else {
+                continue;
+            };
+            let mut score = safe_source_relevance_score(query, &category.category, site);
+            let keywords = match category.category.as_str() {
+                "official_technology" => "rust software programming release linux api",
+                "reported_news" => "news latest today world politics technology ai",
+                "science_reporting" | "official_science_health" => {
+                    "science nasa space research discovery health"
+                }
+                "community_reference" => "rust programming technology ai llm software",
+                _ => "",
+            };
+            score += terms
+                .iter()
+                .filter(|t| keywords.split_whitespace().any(|k| k == t.as_str()))
+                .count() as i32;
+            // Prefer a named source, e.g. Rust, over unrelated technology feeds.
+            if lower.contains(&site.name.to_lowercase()) {
+                score += 5;
+            }
+            if score > 0 {
+                feeds.push((score, site.name.clone(), rss.to_string()));
+            }
+        }
+    }
+    feeds.sort_by_key(|(score, name, _)| (Reverse(*score), name.clone()));
+    feeds
+        .into_iter()
+        .take(limit)
+        .map(|(_, name, url)| citation_source(name, url, "Catalog feed; not yet fetched".into()))
+        .collect()
+}
+
 pub fn filter_suggested_urls_to_safe_sources(
     urls: &[String],
     attempted_domains: &HashSet<String>,
