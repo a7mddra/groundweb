@@ -1,4 +1,4 @@
-# opensearch
+# groundweb
 
 Free, best-effort web grounding for Rust apps and OpenRouter tool calling. HTTP retrieval, parsing, ranking, caching and favicon hydration run on the user's machine. Web indexes and source websites remain remote. There is no search API key, browser runtime, Python sidecar or paid search fallback.
 
@@ -36,15 +36,15 @@ Failures retain whatever evidence is available, with explicit limitations. Searc
 ## Use in an app
 
 ```rust
-let tools = vec![opensearch::tool_definition()];
+let tools = vec![groundweb::tool_definition()];
 // POST OpenRouter /chat/completions with tools and tool_choice: "auto".
 // When the model calls web_search, parse arguments and execute locally:
-let mut args = opensearch::SearchArgs::from_json(&tool_arguments)?;
+let mut args = groundweb::SearchArgs::from_json(&tool_arguments)?;
 // Carry user-pasted links into the first call if the model omits them.
-args.urls.extend(opensearch::urls_from_text(user_prompt));
+args.urls.extend(groundweb::urls_from_text(user_prompt));
 args.urls.sort();
 args.urls.dedup();
-let output = opensearch::execute(args).await?;
+let output = groundweb::execute(args).await?;
 // Preserve the assistant's entire tool_calls array, then append each tool
 // result with the matching tool_call_id. Ask the model to cite returned URLs.
 ```
@@ -90,4 +90,4 @@ Measured workloads and model limitations are recorded in [benchmarks/RESULTS.md]
 
 ## Layout
 
-`opensearch-rs/` contains package `opensearch`; `xtask/` is the task runner. `branches.rs` is the single discovery dispatcher. `mojeek.rs`, `bing.rs`, `public_sources.rs`, and `mcp_search.rs` implement discovery. `fetch.rs` handles URL reading and site adapters; `extract.rs` handles native readability. `html.rs` ranks and normalizes result context. `safe_sources.rs` and `assets/safe_sources.json` select catalog seeds/feeds. `favicon.rs` is the shared public icon layer. `transport.rs`, `retry.rs`, `types.rs` and `url_utils.rs` are shared leaves. `suggester.rs` remains an optional OpenRouter URL suggestion helper; suggestions still require retrieval before grounding.
+`groundweb/` contains package `groundweb`; `xtask/` is the task runner. `branches.rs` is the single discovery dispatcher. `mojeek.rs`, `bing.rs`, `public_sources.rs`, and `mcp_search.rs` implement discovery. `fetch.rs` handles URL reading and site adapters; `extract.rs` handles native readability. `html.rs` ranks and normalizes result context. `safe_sources.rs` and `assets/safe_sources.json` select catalog seeds/feeds. `favicon.rs` is the shared public icon layer. `transport.rs`, `retry.rs`, `types.rs` and `url_utils.rs` are shared leaves. `suggester.rs` remains an optional OpenRouter URL suggestion helper; suggestions still require retrieval before grounding.

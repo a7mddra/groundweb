@@ -86,8 +86,8 @@ fn cmd_doctor(_flags: &[String]) -> Result<()> {
 
     for path in [
         "Cargo.toml",
-        "opensearch-rs/Cargo.toml",
-        "opensearch-rs/src/lib.rs",
+        "groundweb/Cargo.toml",
+        "groundweb/src/lib.rs",
         "xtask/Cargo.toml",
         "xtask/src/main.rs",
         ".cargo/config.toml",
@@ -222,7 +222,7 @@ struct DevOptions {
     live: bool,
     json: bool,
     urls: Vec<String>,
-    branch: opensearch::SearchBranch,
+    branch: groundweb::SearchBranch,
     max_results: Option<usize>,
 }
 fn parse_dev(flags: &[String]) -> Result<DevOptions> {
@@ -234,7 +234,7 @@ fn parse_dev(flags: &[String]) -> Result<DevOptions> {
         live: false,
         json: false,
         urls: vec![],
-        branch: opensearch::SearchBranch::Auto,
+        branch: groundweb::SearchBranch::Auto,
         max_results: None,
     };
     let mut i = 0;
@@ -277,7 +277,7 @@ async fn cmd_dev(flags: &[String]) -> Result<()> {
     let opts = parse_dev(flags)?;
     if opts.live {
         let started = Instant::now();
-        let out = opensearch::execute(opensearch::SearchArgs {
+        let out = groundweb::execute(groundweb::SearchArgs {
             query: opts.prompt,
             urls: opts.urls,
             branch: opts.branch,
@@ -328,7 +328,7 @@ async fn cmd_dev(flags: &[String]) -> Result<()> {
 }
 
 // Keep UI-only data, inlined icons and duplicate summaries out of model tokens.
-fn model_payload(out: &opensearch::SearchOutput) -> serde_json::Value {
+fn model_payload(out: &groundweb::SearchOutput) -> serde_json::Value {
     serde_json::json!({"query":out.query,"mode":out.mode,"context_markdown":out.context_markdown,"sources":out.sources.iter().map(|s|serde_json::json!({"title":s.title,"url":s.url,"summary":s.summary})).collect::<Vec<_>>()})
 }
 
@@ -337,7 +337,7 @@ async fn run_model_loop(
     model: &str,
     base_url: &str,
     max_iters: usize,
-    branch: opensearch::SearchBranch,
+    branch: groundweb::SearchBranch,
     max_results: Option<usize>,
     urls: &[String],
     verbose: bool,
@@ -365,15 +365,15 @@ async fn run_model_loop(
     let mut returned_urls = std::collections::HashSet::<String>::new();
     let mut read_urls = std::collections::HashSet::<String>::new();
     for iter in 1..=max_iters {
-        let request = serde_json::json!({"model":model,"messages":messages,"tools":[opensearch::tool_definition()],"tool_choice":"auto","max_tokens":1800,"provider":{"require_parameters":true}});
+        let request = serde_json::json!({"model":model,"messages":messages,"tools":[groundweb::tool_definition()],"tool_choice":"auto","max_tokens":1800,"provider":{"require_parameters":true}});
         let response = client
             .post(format!(
                 "{}/chat/completions",
                 base_url.trim_end_matches('/')
             ))
             .header("Authorization", format!("Bearer {key}"))
-            .header("HTTP-Referer", "https://github.com/opensearch-rs")
-            .header("X-Title", "opensearch-local-grounding")
+            .header("HTTP-Referer", "https://github.com/a7mddra/groundweb")
+            .header("X-Title", "groundweb-local-grounding")
             .json(&request)
             .send()
             .await
@@ -428,25 +428,24 @@ async fn run_model_loop(
             if verbose {
                 eprintln!("[tool call] {} {}", tc.function.name, tc.function.arguments);
             }
-            let payload = if tc.function.name == opensearch::TOOL_NAME {
+            let payload = if tc.function.name == groundweb::TOOL_NAME {
                 match serde_json::from_str::<serde_json::Value>(&tc.function.arguments)
                     .map_err(anyhow::Error::from)
-                    .and_then(|v| {
-                        opensearch::SearchArgs::from_json(&v).map_err(anyhow::Error::from)
-                    }) {
+                    .and_then(|v| groundweb::SearchArgs::from_json(&v).map_err(anyhow::Error::from))
+                {
                     Ok(mut args) => {
-                        if branch != opensearch::SearchBranch::Auto {
+                        if branch != groundweb::SearchBranch::Auto {
                             args.branch = branch;
                         }
                         if calls == 1 {
-                            args.urls.extend(opensearch::urls_from_text(prompt));
+                            args.urls.extend(groundweb::urls_from_text(prompt));
                             args.urls.extend(urls.iter().cloned());
                             args.urls.sort();
                             args.urls.dedup();
                         }
                         args.max_results = max_results.or(args.max_results);
                         let retrieval = Instant::now();
-                        let result = opensearch::execute(args).await;
+                        let result = groundweb::execute(args).await;
                         retrieval_ms += retrieval.elapsed().as_millis();
                         match result {
                             Ok(out) => {
@@ -486,7 +485,7 @@ async fn cmd_bench(flags: &[String]) -> Result<()> {
     let mut repeats = 1usize;
     let mut output = None;
     let mut model = None;
-    let mut branch = opensearch::SearchBranch::Auto;
+    let mut branch = groundweb::SearchBranch::Auto;
     let mut i = 0;
     while i < flags.len() {
         let flag = &flags[i];
@@ -526,7 +525,7 @@ async fn cmd_bench(flags: &[String]) -> Result<()> {
     for repeat in 0..repeats {
         for (name, prompt) in workloads {
             let start = Instant::now();
-            let result = opensearch::execute(opensearch::SearchArgs {
+            let result = groundweb::execute(groundweb::SearchArgs {
                 query: prompt.into(),
                 urls: vec![],
                 branch,

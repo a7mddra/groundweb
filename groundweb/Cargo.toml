@@ -1,0 +1,28 @@
+[package]
+name = "groundweb"
+version = "0.1.0"
+edition = "2021"
+description = "Free local grounded web-search tool for Rust AI apps via OpenRouter tool calling"
+license = "MIT OR Apache-2.0"
+readme = "../README.md"
+repository = "https://github.com/a7mddra/groundweb"
+homepage = "https://github.com/a7mddra/groundweb"
+keywords = ["openrouter", "tool-calling", "web-search", "ai", "grounding"]
+categories = ["api-bindings"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate", "charset"] }
+dom_smoothie = "0.18.2"
+scraper = "0.24"
+roxmltree = "0.21"
+tokio = { version = "1", features = ["rt", "time", "net", "macros"] }
+url = "2"
+percent-encoding = "2"
+regex = "1"
+lazy_static = "1"
+base64 = "0.22"
+futures-util = "0.3"
+# Pinned to 0.8: retry.rs uses the `thread_rng().gen_range()` API removed in rand 0.9+.
+rand = "0.8"
