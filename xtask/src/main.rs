@@ -30,7 +30,7 @@ fn main() -> Result<()> {
             eprintln!("  build [--release]");
             eprintln!("  doctor");
             eprintln!("  fmt [--all]        (default: git-changed *.rs only)");
-            eprintln!("  dev [--prompt ...] [--model ...] [--base-url ...] [--max-iters N]");
+            eprintln!("  dev [--prompt ...] [--model ...] [--base-url ...] [--max-iters N] [--live] [--max-results N]");
             if args.get(1).is_none() {
                 bail!("no xtask given");
             }
@@ -220,12 +220,59 @@ struct ToolFn {
     arguments: String,
 }
 
+/// Keyless live run: real `opensearch::execute` (Mojeek branch, safe-source
+/// fallback). No OpenRouter key needed — Mojeek is free.
+async fn cmd_dev_live(prompt: &str, max_results: Option<usize>) -> Result<()> {
+    let args = opensearch::SearchArgs {
+        query: prompt.to_string(),
+        urls: vec![],
+        branch: opensearch::SearchBranch::Mojeek,
+        max_results,
+    };
+    println!("== opensearch dev --live ==");
+    println!("branch:  mojeek (+ safe_fallback), keyless");
+    println!("query:   {}", args.query);
+    println!();
+
+    let out = opensearch::execute(args)
+        .await
+        .map_err(|e| anyhow::anyhow!("live search failed: {e}"))?;
+
+    println!("mode:    {}", out.mode);
+    println!("answer:  {}", out.answer_stub);
+    println!("sources: {}", out.sources.len());
+    for (i, s) in out.sources.iter().enumerate() {
+        println!("--- source {} ---", i + 1);
+        println!("title:   {}", s.title);
+        println!("url:     {}", s.url);
+        println!("summary: {}", s.summary);
+        println!(
+            "favicon: {} / inlined: {}",
+            s.favicon_url.as_deref().unwrap_or("-"),
+            if s.favicon_base64.is_some() {
+                "yes"
+            } else {
+                "no"
+            }
+        );
+    }
+    println!("[thinking]");
+    for t in &out.grounded.thinking {
+        println!("- {t}");
+    }
+    let ctx = out.context_markdown.chars().take(3000).collect::<String>();
+    println!("[context head]\n{ctx}");
+    Ok(())
+}
+
 async fn cmd_dev(flags: &[String]) -> Result<()> {
     let _ = dotenvy::dotenv();
     let mut prompt = None::<String>;
     let mut model = None::<String>;
     let mut base_url = None::<String>;
     let mut max_iters = 6usize;
+    let mut live = false;
+    let mut max_results = None::<usize>;
 
     let mut i = 0;
     while i < flags.len() {
@@ -252,14 +299,29 @@ async fn cmd_dev(flags: &[String]) -> Result<()> {
                 i += 1;
                 max_iters = flags.get(i).and_then(|v| v.parse().ok()).unwrap_or(6);
             }
+            "--live" => {
+                live = true;
+            }
+            "--max-results" => {
+                i += 1;
+                max_results = flags.get(i).and_then(|v| v.parse().ok());
+            }
             "--help" | "-h" => {
-                println!("usage: cargo xtask dev [--prompt ...] [--model ...] [--base-url ...] [--max-iters N]");
+                println!("usage: cargo xtask dev [--prompt ...] [--model ...] [--base-url ...] [--max-iters N] [--live] [--max-results N]");
+                println!("  default: OpenRouter tool-call loop with the placeholder tool (needs OPENROUTER_API_KEY).");
+                println!("  --live:  run the real Mojeek branch keylessly via opensearch::execute (no API key).");
                 println!("presets to try: \"search github for <topic> ...\", \"search <xxxx> and compare ...\"");
                 return Ok(());
             }
             other => bail!("unknown dev flag '{other}' (see --help)"),
         }
         i += 1;
+    }
+
+    let prompt = prompt.unwrap_or_else(|| DEFAULT_PROMPT.to_string());
+
+    if live {
+        return cmd_dev_live(&prompt, max_results).await;
     }
 
     let api_key = std::env::var("OPENROUTER_API_KEY").unwrap_or_default();
@@ -274,7 +336,6 @@ async fn cmd_dev(flags: &[String]) -> Result<()> {
         .or_else(|| std::env::var("OPENROUTER_BASE_URL").ok())
         .filter(|u| !u.is_empty())
         .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
-    let prompt = prompt.unwrap_or_else(|| DEFAULT_PROMPT.to_string());
 
     println!("== opensearch dev ==");
     println!("model:   {model}");
