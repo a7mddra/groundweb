@@ -1,5 +1,5 @@
 // Copyright 2026 a7mddra
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 //! Keyless Mojeek HTML discovery. New providers dispatch beside it in branches.
 //! Blocks fail promptly so shared discovery can preserve other providers.

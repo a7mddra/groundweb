@@ -1,5 +1,5 @@
 // Copyright 2026 a7mddra
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 //! Trusted-source layer: a curated `safe_sources.json` catalog plus the two
 //! helpers every branch (and the `execute` fallback) uses.

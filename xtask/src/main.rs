@@ -1,4 +1,4 @@
-//! xtask: repo task runner (`cargo xtask <build|doctor|fmt|dev|bench>`).
+//! xtask: repo task runner (`cargo xtask <build|doctor|fmt|dev|bench|publish>`).
 //!
 //! Alias is configured in `.cargo/config.toml` (`xtask = "run -p xtask --"`).
 //! Keep this binary dependency-light and shell out to `cargo`/`rustfmt`/`git`
@@ -17,6 +17,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("build") => cmd_build(&args[2..]),
+        Some("publish") => cmd_publish(&args[2..]),
         Some("doctor") => cmd_doctor(&args[2..]),
         Some("fmt") => cmd_fmt(&args[2..]),
         Some("dev") | Some("bench") => {
@@ -31,8 +32,9 @@ fn main() -> Result<()> {
             }
         }
         Some("--help") | Some("-h") | None => {
-            eprintln!("usage: cargo xtask <build|doctor|fmt|dev|bench> [flags]");
+            eprintln!("usage: cargo xtask <build|doctor|fmt|dev|bench|publish> [flags]");
             eprintln!("  build [--release]");
+            eprintln!("  publish [--dry-run] (groundweb only, crates.io, locked dependencies)");
             eprintln!("  doctor");
             eprintln!("  fmt [--all]        (default: git-changed *.rs only)");
             eprintln!("  dev [--prompt ...] [--model ...] [--base-url ...] [--max-iters N] [--live] [--max-results N]");
@@ -42,7 +44,9 @@ fn main() -> Result<()> {
             Ok(())
         }
         Some(other) => {
-            bail!("unknown xtask '{other}'. expected: build | doctor | fmt | dev | bench");
+            bail!(
+                "unknown xtask '{other}'. expected: build | doctor | fmt | dev | bench | publish"
+            );
         }
     }
 }
@@ -59,6 +63,32 @@ fn cmd_build(flags: &[String]) -> Result<()> {
     let status = cmd.status().context("run cargo build --workspace")?;
     if !status.success() {
         bail!("cargo build failed");
+    }
+    Ok(())
+}
+
+// ---- publish ----
+
+fn cmd_publish(flags: &[String]) -> Result<()> {
+    if let Some(flag) = flags.iter().find(|flag| flag.as_str() != "--dry-run") {
+        bail!("unsupported publish flag '{flag}'. expected: --dry-run");
+    }
+    let mut cmd = Command::new("cargo");
+    cmd.args([
+        "publish",
+        "--package",
+        "groundweb",
+        "--registry",
+        "crates-io",
+        "--locked",
+    ]);
+    if flags.iter().any(|flag| flag == "--dry-run") {
+        cmd.arg("--dry-run");
+    }
+    println!("> {cmd:?}");
+    let status = cmd.status().context("run cargo publish for groundweb")?;
+    if !status.success() {
+        bail!("cargo publish failed");
     }
     Ok(())
 }

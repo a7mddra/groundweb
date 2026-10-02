@@ -1,5 +1,5 @@
 // Copyright 2026 a7mddra
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: MIT
 
 //! Shared result/error types for all search branches.
 //!

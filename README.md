@@ -35,6 +35,10 @@ Failures retain whatever evidence is available, with explicit limitations. Searc
 
 ## Use in an app
 
+```sh
+cargo add groundweb
+```
+
 ```rust
 let tools = vec![groundweb::tool_definition()];
 // POST OpenRouter /chat/completions with tools and tool_choice: "auto".
@@ -91,3 +95,11 @@ Measured workloads and model limitations are recorded in [benchmarks/RESULTS.md]
 ## Layout
 
 `groundweb/` contains package `groundweb`; `xtask/` is the task runner. `branches.rs` is the single discovery dispatcher. `mojeek.rs`, `bing.rs`, `public_sources.rs`, and `mcp_search.rs` implement discovery. `fetch.rs` handles URL reading and site adapters; `extract.rs` handles native readability. `html.rs` ranks and normalizes result context. `safe_sources.rs` and `assets/safe_sources.json` select catalog seeds/feeds. `favicon.rs` is the shared public icon layer. `transport.rs`, `retry.rs`, `types.rs` and `url_utils.rs` are shared leaves. `suggester.rs` remains an optional OpenRouter URL suggestion helper; suggestions still require retrieval before grounding.
+
+## Publishing
+
+After committing release changes, run `cargo xtask publish --dry-run` to verify the standalone package, then `cargo xtask publish` to upload `groundweb` to crates.io. Both commands use locked dependencies; `xtask` itself is never published.
+
+## License
+
+Licensed under [MIT](LICENSE).

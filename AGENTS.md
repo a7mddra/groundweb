@@ -19,6 +19,7 @@
 ## Commands (use these, not raw cargo)
 
 - `cargo xtask build [--release]` — builds `--workspace`.
+- `cargo xtask publish [--dry-run]` — packages only `groundweb` for crates.io with locked dependencies. Commit release changes first. Use an actual upload only when the user explicitly requests a release.
 - `cargo xtask doctor` — toolchain + layout check; missing `OPENROUTER_API_KEY` is a warn, not a failure (Mojeek branch and `dev --live` are keyless).
 - `cargo xtask fmt` — formats **git-changed `*.rs` only**; `cargo xtask fmt --all` = `cargo fmt --all`.
 - `cargo xtask dev [--prompt ...] [--model ...] [--base-url ...] [--max-iters N]` — OpenRouter tool-call loop with real local retrieval (needs `.env` key). `--live [--prompt ...] [--max-results N]` — real `execute()` (keyless, no model involved); `--branch`, repeated `--url`, and `--json` select manual runs.
