@@ -13,6 +13,7 @@ Library paths below are relative to `groundweb/src/`:
 | Location | Responsibility |
 | --- | --- |
 | `lib.rs` | Public API, tool definition, argument validation, search/URL execution, and output assembly |
+| `execution.rs` | Execution limits, retrieval progress events, and structured partial failures |
 | `branches.rs` | Provider dispatch, automatic aggregation, and provider cooldowns |
 | `mojeek.rs`, `bing.rs`, `public_sources.rs`, `mcp_search.rs` | Discovery adapters |
 | `fetch.rs`, `extract.rs` | Public URL retrieval, site adapters, feeds, and native readable-text extraction |
@@ -38,7 +39,7 @@ Library paths below are relative to `groundweb/src/`:
 
 ## Model integration
 
-- `execute()` needs no model or search API key. URLs in `SearchArgs.urls` or `query` trigger direct reading; calls without URLs perform discovery. `fetch_url_from_allowed` is the optional gated API for callers restricting reads to previously discovered sources.
+- `execute()` needs no model or search API key. URLs in `SearchArgs.urls` or `query` trigger direct reading; calls without URLs perform discovery. `fetch_url_from_allowed` is the optional gated API for callers restricting reads to previously discovered sources. `execute_with_options` adds bounded execution controls and a fast progress callback. Dropping its future cancels retrieval; callbacks describe observed retrieval, never model thinking.
 - The reference loop uses OpenRouter/OpenAI-compatible chat completions with `groundweb::tool_definition()`. Preserve the entire assistant `tool_calls` array and append a tool result for every call with its matching `tool_call_id`. Unknown tool names return a JSON error.
 - Carry user-pasted URLs into the first tool call with `urls_from_text` if the model omitted them. Let subsequent calls use the model's requested URLs. Give the model readable context and compact source metadata; keep favicon bytes and duplicate UI traces out of model context. Request citations to returned URLs.
 - `.env` is for the model loop and optional URL suggester. For free-model runs, explicitly select `openrouter/free` or a currently available `:free` model; an existing `OPENROUTER_MODEL` may select a paid model. The benchmark runner accepts only free endpoints.

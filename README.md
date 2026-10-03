@@ -57,6 +57,23 @@ Carry pasted links only into the first call; subsequent calls should use the mod
 
 The result limit defaults to eight and accepts up to twenty. Search reads up to three pages, trying up to six candidates when earlier pages fail; URL mode accepts up to eight URLs and respects `max_results`. Keep `TOOL_NAME = "web_search"`, `CitationSource`, and `GroundedReasoning` stable in consumers. The old placeholder API has been removed.
 
+## Progress and retrieval limits
+
+Use `execute_with_options(args, ExecutionOptions::default(), on_progress)` for live progress.
+`ProgressEvent` reports each discovery branch, requested URL, successfully read source,
+favicon-ready metadata and structured failures. A `Read` event includes the requested URL
+and the resolved source; redirects do not lose the activity's identity. `SourceReady.fetched`
+distinguishes full reads from discovery excerpts. These are retrieval observations, never
+model reasoning. Keep callbacks fast; no callback runs after the execution future is dropped.
+
+`ExecutionOptions` controls pages to read, page attempts, combined context characters,
+discovery deadline and reading-batch deadline. Values are clamped to resource ceilings:
+eight successful pages, twenty attempts, 128,000 context characters and thirty-second batches.
+Direct URL reads still respect the eight-URL bound and per-page limits. Dropping the future
+cancels retrieval without leaving background workers. `SearchOutput.failures` retains each
+failed provider/page's stage, target, error kind, retryability and available retry timing.
+Other branches and successfully retrieved sources continue to be useful.
+
 ## Run locally
 
 ```sh
