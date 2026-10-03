@@ -8,7 +8,8 @@ use std::{
 };
 
 use crate::{
-    constants::{DEFAULT_MAX_RESULTS, DISCOVERY_TIMEOUT_SECS},
+    constants::DEFAULT_MAX_RESULTS,
+    execution::{Observer, ProgressEvent, RetrievalFailure},
     html::{build_query_result, rerank_sources},
     transport::TransportClients,
     types::WebSearchResult,
@@ -48,6 +49,8 @@ pub(crate) fn run_branch<'a>(
     query: &'a str,
     max_results: Option<usize>,
     clients: &'a TransportClients,
+    timeout_secs: u64,
+    progress: Observer<'a>,
 ) -> BoxFuture<'a, Result<WebSearchResult, String>> {
     Box::pin(async move {
         let limit = max_results.unwrap_or(DEFAULT_MAX_RESULTS);
@@ -63,7 +66,15 @@ pub(crate) fn run_branch<'a>(
                 .map(|provider| async move {
                     (
                         provider,
-                        run_branch(provider, query, Some(limit), clients).await,
+                        run_branch(
+                            provider,
+                            query,
+                            Some(limit),
+                            clients,
+                            timeout_secs,
+                            progress,
+                        )
+                        .await,
                     )
                 })
                 .buffer_unordered(5);
@@ -96,13 +107,29 @@ pub(crate) fn run_branch<'a>(
             result.mode = "auto".into();
             return Ok(result);
         }
+        progress(ProgressEvent::Discovering { branch });
         if COOLDOWNS
             .lock()
             .unwrap()
             .get(&branch)
             .is_some_and(|until| *until > Instant::now())
         {
-            return Err("temporarily cooling down after a block/rate limit".into());
+            let failure = RetrievalFailure {
+                target: branch.as_str().into(),
+                stage: "discovery".into(),
+                kind: "cooldown".into(),
+                message: "temporarily cooling down after a block/rate limit".into(),
+                retryable: true,
+                retry_after_secs: COOLDOWNS
+                    .lock()
+                    .unwrap()
+                    .get(&branch)
+                    .map(|until| until.saturating_duration_since(Instant::now()).as_secs()),
+            };
+            progress(ProgressEvent::Failed {
+                failure: failure.clone(),
+            });
+            return Err(failure.message);
         }
         let task = async {
             match branch {
@@ -120,10 +147,15 @@ pub(crate) fn run_branch<'a>(
                 SearchBranch::Auto => unreachable!(),
             }
         };
-        let started = Instant::now();
-        let result = tokio::time::timeout(Duration::from_secs(DISCOVERY_TIMEOUT_SECS), task)
+        let result = tokio::time::timeout(Duration::from_secs(timeout_secs), task)
             .await
-            .map_err(|_| "discovery deadline exceeded".to_string())?
+            .map_err(|_| {
+                let failure = RetrievalFailure::deadline(branch.as_str().into(), "discovery");
+                progress(ProgressEvent::Failed {
+                    failure: failure.clone(),
+                });
+                failure.message
+            })?
             .map_err(|e| {
                 if matches!(e.kind, crate::types::SearchFailureClass::Challenge)
                     || e.message.contains("429")
@@ -133,15 +165,23 @@ pub(crate) fn run_branch<'a>(
                         Instant::now() + Duration::from_secs(e.retry_after_secs.unwrap_or(60)),
                     );
                 }
+                progress(ProgressEvent::Failed {
+                    failure: RetrievalFailure {
+                        target: branch.as_str().into(),
+                        stage: "discovery".into(),
+                        kind: e.kind.as_str().into(),
+                        message: e.message.clone(),
+                        retryable: e.retriable,
+                        retry_after_secs: e.retry_after_secs,
+                    },
+                });
                 e.public_message()
             });
-        eprintln!(
-            "[WebSearch] provider={} elapsed_ms={} results={}",
-            branch.as_str(),
-            started.elapsed().as_millis(),
-            result.as_ref().map(|r| r.sources.len()).unwrap_or(0)
-        );
         result.map(|mut result| {
+            progress(ProgressEvent::Discovered {
+                branch,
+                sources: result.sources.len(),
+            });
             result.mode = branch.as_str().into();
             result
         })

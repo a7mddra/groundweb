@@ -9,6 +9,7 @@
 mod bing;
 mod branches;
 mod constants;
+mod execution;
 mod extract;
 pub mod favicon;
 mod fetch;
@@ -24,6 +25,7 @@ mod types;
 mod url_utils;
 
 pub use branches::SearchBranch;
+pub use execution::{ExecutionOptions, ProgressEvent, RetrievalFailure};
 pub use favicon::{citation_source, favicon_for_url, hydrate_favicons_for_sources};
 pub use fetch::{
     collect_allowed_sources, fetch_url_from_allowed, fetch_url_from_allowed_with_progress,
@@ -127,6 +129,8 @@ pub struct SearchOutput {
     #[serde(default)]
     pub sources: Vec<CitationSource>,
     pub grounded: GroundedReasoning,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<RetrievalFailure>,
 }
 
 impl SearchOutput {
@@ -184,6 +188,7 @@ impl SearchOutput {
             answer_stub,
             context_markdown: result.context_markdown.clone(),
             sources: result.sources.clone(),
+            failures: Vec::new(),
             grounded: GroundedReasoning {
                 urls_fetched,
                 briefs,
@@ -268,6 +273,23 @@ pub fn urls_from_text(text: &str) -> Vec<String> {
 /// Execute real discovery or direct URL reading. No model or search API key
 /// is needed; HTTP operations, extraction, ranking and hydration run locally.
 pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
+    execute_with_options(args, ExecutionOptions::default(), |_| {}).await
+}
+
+/// Execute with live progress and caller-controlled bounded retrieval limits.
+pub async fn execute_with_options(
+    args: SearchArgs,
+    options: ExecutionOptions,
+    on_progress: impl Fn(ProgressEvent) + Send + Sync,
+) -> Result<SearchOutput, Error> {
+    let options = options.bounded();
+    let failures = std::sync::Mutex::new(Vec::new());
+    let progress = |event: ProgressEvent| {
+        if let ProgressEvent::Failed { failure } = &event {
+            failures.lock().unwrap().push(failure.clone());
+        }
+        on_progress(event);
+    };
     let query = args.query.trim();
     if query.is_empty() && args.urls.is_empty() {
         return Err(Error::InvalidArgs("query or urls is required".into()));
@@ -317,16 +339,26 @@ pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
         let mut tasks = stream::iter(urls.iter().take(limit).cloned().enumerate())
             .map(|(i, url)| {
                 let clients = &clients;
-                async move { (i, url.clone(), fetch::fetch_page(&url, clients).await) }
+                let progress = &progress;
+                async move {
+                    progress(ProgressEvent::Reading { url: url.clone() });
+                    let page = fetch::fetch_page(&url, clients).await;
+                    report_page(&url, &page, progress);
+                    (i, url, page)
+                }
             })
             .buffer_unordered(constants::FETCH_CONCURRENCY);
         let mut pages = Vec::new();
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(20);
+        let deadline = tokio::time::Instant::now()
+            + std::time::Duration::from_secs(options.reading_timeout_secs);
         while let Ok(Some(page)) = tokio::time::timeout_at(deadline, tasks.next()).await {
             pages.push(page);
         }
         for (i, url) in urls.iter().take(limit).enumerate() {
             if !pages.iter().any(|(index, _, _)| *index == i) {
+                progress(ProgressEvent::Failed {
+                    failure: RetrievalFailure::deadline(url.clone(), "reading"),
+                });
                 notes.push(format!(
                     "Could not read {url}: batch retrieval deadline exceeded"
                 ));
@@ -372,7 +404,15 @@ pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
             },
         }
     } else {
-        let discovery = branches::run_branch(args.branch, query, Some(limit), &clients).await;
+        let discovery = branches::run_branch(
+            args.branch,
+            query,
+            Some(limit),
+            &clients,
+            options.discovery_timeout_secs,
+            &progress,
+        )
+        .await;
         let mut result = match discovery {
             Ok(result) => result,
             Err(error) => {
@@ -387,10 +427,17 @@ pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
                 let mut tasks = stream::iter(candidates)
                     .map(|s| {
                         let clients = &clients;
-                        async move { fetch::fetch_page(&s.url, clients).await }
+                        let progress = &progress;
+                        async move {
+                            progress(ProgressEvent::Reading { url: s.url.clone() });
+                            let page = fetch::fetch_page(&s.url, clients).await;
+                            report_page(&s.url, &page, progress);
+                            page
+                        }
                     })
                     .buffer_unordered(constants::FETCH_CONCURRENCY);
-                let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+                let deadline = tokio::time::Instant::now()
+                    + std::time::Duration::from_secs(options.reading_timeout_secs);
                 while let Ok(Some(page)) = tokio::time::timeout_at(deadline, tasks.next()).await {
                     if let Ok(page) = page {
                         // A matching name alone is not evidence for a query.
@@ -408,28 +455,36 @@ pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
             }
         };
         if result.mode != "safe_fallback" {
-            let selected: Vec<_> = result.sources.iter().take(6).cloned().collect();
+            let selected: Vec<_> = result
+                .sources
+                .iter()
+                .take(options.page_attempts)
+                .cloned()
+                .collect();
             let mut tasks = stream::iter(selected.into_iter().enumerate())
                 .map(|(i, source)| {
                     let clients = &clients;
+                    let progress = &progress;
                     async move {
-                        (
-                            i,
-                            source.clone(),
-                            fetch::fetch_page(&source.url, clients).await,
-                        )
+                        progress(ProgressEvent::Reading {
+                            url: source.url.clone(),
+                        });
+                        let page = fetch::fetch_page(&source.url, clients).await;
+                        report_page(&source.url, &page, progress);
+                        (i, source, page)
                     }
                 })
                 .buffer_unordered(constants::FETCH_CONCURRENCY);
             let mut pages = Vec::new();
-            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+            let deadline = tokio::time::Instant::now()
+                + std::time::Duration::from_secs(options.reading_timeout_secs);
             let mut successes = 0;
             while let Ok(Some(page)) = tokio::time::timeout_at(deadline, tasks.next()).await {
                 if page.2.is_ok() {
                     successes += 1;
                 }
                 pages.push(page);
-                if successes >= 3 {
+                if successes >= options.pages_to_read {
                     break;
                 }
             }
@@ -452,7 +507,8 @@ pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
             .context_markdown
             .push_str(&format!("\n[Retrieval limitations]\n{note}\n"));
     }
-    result.context_markdown = extract::truncate_chars(&result.context_markdown, 64_000);
+    result.context_markdown =
+        extract::truncate_chars(&result.context_markdown, options.context_chars);
     favicon::hydrate_favicons_for_sources(&mut result.sources).await;
     let note = result.message.clone();
     let mut out = SearchOutput::from_web_result(args.query, args.branch, &result, note);
@@ -464,7 +520,34 @@ pub async fn execute(args: SearchArgs) -> Result<SearchOutput, Error> {
         "{} pages retrieved; remaining sources are discovery excerpts only",
         fetched.len()
     ));
+    out.failures = failures.into_inner().unwrap();
+    for source in &out.sources {
+        on_progress(ProgressEvent::SourceReady {
+            source: source.clone(),
+            fetched: fetched.contains(&source.url),
+        });
+    }
+    on_progress(ProgressEvent::Finished {
+        sources: out.sources.len(),
+        pages_read: fetched.len(),
+    });
     Ok(out)
+}
+
+fn report_page(
+    url: &str,
+    page: &Result<fetch::Page, types::SearchError>,
+    progress: execution::Observer<'_>,
+) {
+    match page {
+        Ok(page) => progress(ProgressEvent::Read {
+            url: url.into(),
+            source: page.source.clone(),
+        }),
+        Err(error) => progress(ProgressEvent::Failed {
+            failure: RetrievalFailure::page(url.into(), error),
+        }),
+    }
 }
 
 #[cfg(test)]
