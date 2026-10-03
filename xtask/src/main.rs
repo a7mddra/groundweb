@@ -307,12 +307,42 @@ async fn cmd_dev(flags: &[String]) -> Result<()> {
     let opts = parse_dev(flags)?;
     if opts.live {
         let started = Instant::now();
-        let out = groundweb::execute(groundweb::SearchArgs {
-            query: opts.prompt,
-            urls: opts.urls,
-            branch: opts.branch,
-            max_results: opts.max_results,
-        })
+        let out = groundweb::execute_with_options(
+            groundweb::SearchArgs {
+                query: opts.prompt,
+                urls: opts.urls,
+                branch: opts.branch,
+                max_results: opts.max_results,
+            },
+            groundweb::ExecutionOptions::default(),
+            |event| {
+                use groundweb::ProgressEvent;
+                match event {
+                    ProgressEvent::Discovering { branch } => {
+                        eprintln!("[progress] discovering {}", branch.as_str())
+                    }
+                    ProgressEvent::Discovered { branch, sources } => eprintln!(
+                        "[progress] discovered {} sources={sources}",
+                        branch.as_str()
+                    ),
+                    ProgressEvent::Reading { url } => eprintln!("[progress] reading {url}"),
+                    ProgressEvent::Read { url, .. } => eprintln!("[progress] read {url}"),
+                    ProgressEvent::SourceReady { source, fetched } => eprintln!(
+                        "[progress] source {} fetched={fetched} favicon={}",
+                        source.url,
+                        source.favicon_base64.is_some()
+                    ),
+                    ProgressEvent::Failed { failure } => eprintln!(
+                        "[progress] failed {} {} {}",
+                        failure.stage, failure.target, failure.kind
+                    ),
+                    ProgressEvent::Finished {
+                        sources,
+                        pages_read,
+                    } => eprintln!("[progress] finished sources={sources} pages={pages_read}"),
+                }
+            },
+        )
         .await?;
         eprintln!(
             "[retrieval] elapsed_ms={} sources={} fetched={} favicons={}",
